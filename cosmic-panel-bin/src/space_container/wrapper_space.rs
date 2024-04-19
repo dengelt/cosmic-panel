@@ -302,10 +302,7 @@ impl WrapperSpace for SpaceContainer {
         // add window to the space with a client that matches the window
         let w_client = s_top_level
             .toplevel()
-            .expect("Missing toplevel")
-            .wl_surface()
-            .client()
-            .map(|c| c.id());
+            .and_then(|t| t.wl_surface().client().map(|c| c.id()));
 
         if let Some(space) = self.space_list.iter_mut().find(|space| {
             space

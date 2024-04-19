@@ -425,7 +425,9 @@ impl WrapperSpace for PanelSpace {
                     "X_MINIMIZE_APPLET".to_string(),
                     panel_client.minimize_priority.is_some().to_string(),
                 ));
-
+                if panel_client.name == "com.system76.CosmicAppletNetwork" {
+                    applet_env.push(("WAYLAND_DEBUG".to_string(), "1".to_string()));
+                }
                 if requests_wayland_display {
                     if let Some(security_context_manager) = security_context_manager.as_ref() {
                         match security_context_manager.create_listener::<W>(qh) {
@@ -439,6 +441,7 @@ impl WrapperSpace for PanelSpace {
                                     "X_PRIVILEGED_WAYLAND_SOCKET".to_string(),
                                     privileged_socket.as_raw_fd().to_string(),
                                 ));
+
                                 fds.push(privileged_socket.into());
                                 panel_client.security_ctx = Some(security_context);
                             }

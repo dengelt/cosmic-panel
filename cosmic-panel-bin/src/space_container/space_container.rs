@@ -9,7 +9,7 @@ use cctk::{
     cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1::ZcosmicToplevelHandleV1,
     toplevel_info::ToplevelInfo, workspace::WorkspaceGroup,
 };
-use cosmic_config::CosmicConfigEntry;
+use cosmic::cosmic_config::CosmicConfigEntry;
 use cosmic_panel_config::{
     CosmicPanelBackground, CosmicPanelConfig, CosmicPanelContainerConfig, CosmicPanelOuput,
     PanelAnchor,
@@ -147,13 +147,9 @@ impl SpaceContainer {
                 s.space
                     .elements()
                     .find(|w| {
-                        w.toplevel()
-                            .expect("Missing toplevel")
-                            .wl_surface()
-                            .client()
-                            .map(|c| c.id())
-                            .as_ref()
-                            == Some(&old_client_id)
+                        w.toplevel().is_some_and(|t| {
+                            t.wl_surface().client().map(|c| c.id()).as_ref() == Some(&old_client_id)
+                        })
                     })
                     .cloned()
             };

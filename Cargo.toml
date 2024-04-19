@@ -30,4 +30,4 @@ sctk = { git = "https://github.com/smithay/client-toolkit//", package = "smithay
 sctk = { git = "https://github.com/smithay/client-toolkit", package = "smithay-client-toolkit", features = [
     "calloop",
     "xkbcommon",
-], rev = "2e9bf9f" }
+], rev = "3bed072" }
