@@ -9,7 +9,7 @@ use cctk::{
     cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1::ZcosmicToplevelHandleV1,
     toplevel_info::ToplevelInfo, workspace::WorkspaceGroup,
 };
-use cosmic::cosmic_config::CosmicConfigEntry;
+use cosmic::{cosmic_config::CosmicConfigEntry, iced::id};
 use cosmic_panel_config::{
     CosmicPanelBackground, CosmicPanelConfig, CosmicPanelContainerConfig, CosmicPanelOuput,
     PanelAnchor,
@@ -494,5 +494,9 @@ impl SpaceContainer {
         spaces.sort_by(|a, b| a.config.get_priority().cmp(&b.config.get_priority()));
         spaces.reverse();
         spaces
+    }
+
+    pub fn toggle_overflow_popup(&mut self, id: id::Id) {
+        // TODO implement
     }
 }

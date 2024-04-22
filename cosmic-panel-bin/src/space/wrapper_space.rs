@@ -59,9 +59,12 @@ use xdg_shell_wrapper::{
     wp_viewporter::ViewporterState,
 };
 
-use crate::space::{
-    panel_space::{AppletAutoClickAnchor, PanelClient},
-    AppletMsg,
+use crate::{
+    iced::elements::CosmicMappedInternal,
+    space::{
+        panel_space::{AppletAutoClickAnchor, PanelClient},
+        AppletMsg,
+    },
 };
 
 use super::PanelSpace;
@@ -93,7 +96,8 @@ impl WrapperSpace for PanelSpace {
                 });
             });
         }
-        self.space.map_element(w.clone(), (0, 0), false);
+        self.space
+            .map_element(CosmicMappedInternal::Window(w.clone()), (0, 0), false);
     }
 
     fn add_popup<W: WrapperSpace>(
@@ -635,7 +639,8 @@ impl WrapperSpace for PanelSpace {
     }
 
     fn raise_window(&mut self, w: &Window, activate: bool) {
-        self.space.raise_element(w, activate);
+        self.space
+            .raise_element(&CosmicMappedInternal::Window(w.clone()), activate);
     }
 
     fn dirty_window(&mut self, _dh: &DisplayHandle, s: &s_WlSurface) {
@@ -644,6 +649,13 @@ impl WrapperSpace for PanelSpace {
         if let Some(w) = self
             .space
             .elements()
+            .filter_map(|w| {
+                if let CosmicMappedInternal::Window(w) = w {
+                    Some(w)
+                } else {
+                    None
+                }
+            })
             .find(|w| w.wl_surface().as_ref() == Some(s))
         {
             w.on_commit();
