@@ -89,6 +89,19 @@ impl WrapperSpace for PanelSpace {
 
     fn add_window(&mut self, w: Window) {
         self.is_dirty = true;
+        if let Some(t) = w.toplevel() {
+            let suggested_size = self.config.size.get_applet_icon_size(true) as i32
+                + self.config.size.get_applet_padding(true) as i32 * 2;
+            let is_horizontal = self.config.is_horizontal();
+            t.with_pending_state(|state| {
+                state.size = Some(if is_horizontal {
+                    (0, suggested_size).into()
+                } else {
+                    (suggested_size, 0).into()
+                });
+            });
+            t.send_pending_configure();
+        }
         if let Some(s) = w.wl_surface() {
             with_states(&s, |states| {
                 with_fractional_scale(states, |fractional_scale| {
@@ -461,7 +474,7 @@ impl WrapperSpace for PanelSpace {
                                 error!(?why, "Failed to create a listener");
                             }
                         }
-                    };
+                    }
                 }
 
                 for (key, val) in &env_vars {

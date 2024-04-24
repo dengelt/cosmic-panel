@@ -314,6 +314,7 @@ impl WrapperSpace for SpaceContainer {
                 .chain(space.clients_right.lock().unwrap().iter())
                 .any(|c| Some(c.client.id()) == w_client)
         }) {
+            
             space.add_window(s_top_level);
         }
     }

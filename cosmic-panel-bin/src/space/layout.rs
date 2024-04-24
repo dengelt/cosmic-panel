@@ -186,9 +186,9 @@ impl PanelSpace {
         let spacing_scaled = spacing_u32 as f64 * self.scale;
         // First try partitioning the panel evenly into N spaces.
         // If all windows fit into each space, then set their offsets and return.
-        let list_thickness = match anchor {
-            PanelAnchor::Left | PanelAnchor::Right => self.dimensions.w,
-            PanelAnchor::Top | PanelAnchor::Bottom => self.dimensions.h,
+        let (list_cross, layer_major) = match anchor {
+            PanelAnchor::Left | PanelAnchor::Right => (self.dimensions.w, self.dimensions.h),
+            PanelAnchor::Top | PanelAnchor::Bottom => (self.dimensions.h, self.dimensions.w),
         };
         let is_dock = !self.config.expand_to_edges();
 
@@ -280,13 +280,14 @@ impl PanelSpace {
             _ => panic!("input region or layer missing"),
         };
 
-        let (new_list_dim_length, new_list_thickness_dim) = match anchor {
-            PanelAnchor::Left | PanelAnchor::Right => (new_dim.h, new_dim.w),
-            PanelAnchor::Top | PanelAnchor::Bottom => (new_dim.w, new_dim.h),
+        let (new_list_dim_length, new_list_thickness_dim) = if self.config.is_horizontal() {
+            (new_dim.w, new_dim.h)
+        } else {
+            (new_dim.h, new_dim.w)
         };
 
         self.panel_changed |= old_actual != self.actual_size
-            || new_list_thickness_dim != list_thickness
+            || new_list_thickness_dim != list_cross
             || self.animate_state.is_some();
 
         let left_sum = left_sum_scaled / self.scale;
@@ -395,7 +396,7 @@ impl PanelSpace {
                 as f64
                 / 2.
         };
-        if new_list_thickness_dim != list_thickness {
+        if new_list_thickness_dim != list_cross {
             self.pending_dimensions = Some(new_dim);
             self.is_dirty = true;
             anyhow::bail!("resizing list");
@@ -505,6 +506,9 @@ impl PanelSpace {
 // applets that are in the overflow popup are not constrained, but are instead moved to the overflow popup space.
 
 // If after all constraints are applied, the panel is still too small, then the panel will move the offending applet to overflow.
+
+// When there is more space available in a section, the applets in the overflow popup will be moved back to the panel.
+// If there is still space in the panel, then the constrained applets that shrink should be unconstrained
 
 // panels will now have up to 4 spaces.
 // they can have nested popups in a common use case now too.

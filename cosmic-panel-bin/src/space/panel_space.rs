@@ -181,6 +181,9 @@ pub(crate) struct PanelSpace {
     pub(crate) clients_left: Clients,
     pub(crate) clients_center: Clients,
     pub(crate) clients_right: Clients,
+    pub(crate) overflow_left: Space<Window>,
+    pub(crate) overflow_center: Space<Window>,
+    pub(crate) overflow_right: Space<Window>,
     pub(crate) last_dirty: Option<Instant>,
     // pending size of the panel
     pub(crate) pending_dimensions: Option<Size<i32, Logical>>,
@@ -246,6 +249,9 @@ impl PanelSpace {
         Self {
             config,
             space: Space::default(),
+            overflow_left: Space::default(),
+            overflow_center: Space::default(),
+            overflow_right: Space::default(),
             unmapped: Vec::new(),
             clients_left: Default::default(),
             clients_center: Default::default(),
