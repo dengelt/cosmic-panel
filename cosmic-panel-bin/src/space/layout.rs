@@ -1,29 +1,34 @@
 use std::slice::IterMut;
 
-use crate::iced::elements::CosmicMappedInternal;
-use crate::minimize::MinimizeApplet;
-use crate::space::corner_element::RoundedRectangleSettings;
-use crate::space::Alignment;
+use crate::{
+    iced::elements::CosmicMappedInternal,
+    minimize::MinimizeApplet,
+    space::{corner_element::RoundedRectangleSettings, Alignment},
+};
 
 use super::PanelSpace;
 use cosmic_panel_config::PanelAnchor;
 use itertools::{chain, Itertools};
 use sctk::shell::WaylandSurface;
-use smithay::utils::{IsAlive, Physical, Size};
-use smithay::{desktop::Window, reexports::wayland_server::Resource, utils::Rectangle};
+use smithay::{
+    desktop::Window,
+    reexports::wayland_server::Resource,
+    utils::{IsAlive, Physical, Rectangle, Size},
+};
 
 impl PanelSpace {
     pub(crate) fn layout_(&mut self) -> anyhow::Result<()> {
         let gap = self.gap();
 
         let make_indices_contiguous = |windows: &mut Vec<(usize, Window, Option<u32>)>| {
-            windows.sort_by(|(a_i, _, _), (b_i, _, _)| a_i.cmp(b_i));
-            for (j, (i, _, _)) in windows.iter_mut().enumerate() {
+            windows.sort_by(|(a_i, ..), (b_i, ..)| a_i.cmp(b_i));
+            for (j, (i, ..)) in windows.iter_mut().enumerate() {
                 *i = j;
             }
         };
         let mut to_map: Vec<Window> = Vec::with_capacity(self.space.elements().count());
-        // must handle unmapped windows, and unmap windows that are too large for the current configuration.
+        // must handle unmapped windows, and unmap windows that are too large for the
+        // current configuration.
         let to_unmap = self
             .space
             .elements()
@@ -40,13 +45,14 @@ impl PanelSpace {
                 let constrained = self.constrain_dim(size, Some(gap as u32));
 
                 let unmap = if self.config.is_horizontal() {
-                        constrained.h < size.h
-                    } else {
-                        constrained.w < size.w
-                    };
+                    constrained.h < size.h
+                } else {
+                    constrained.w < size.w
+                };
                 if unmap {
                     tracing::error!(
-                        "Window {size:?} is too large for what panel configuration allows {constrained:?}. It will be unmapped.",
+                        "Window {size:?} is too large for what panel configuration allows \
+                         {constrained:?}. It will be unmapped.",
                     );
                 } else {
                     to_map.push(w.clone());
@@ -74,8 +80,7 @@ impl PanelSpace {
         // HACK temporarily avoid unmapping windows when changing scale
         if to_unmap.len() > 0 && self.scale_change_retries == 0 {
             for w in to_unmap {
-                self.space
-                    .unmap_elem(&CosmicMappedInternal::Window(w.clone()));
+                self.space.unmap_elem(&CosmicMappedInternal::Window(w.clone()));
                 self.unmapped.push(w);
             }
         } else {
@@ -84,29 +89,21 @@ impl PanelSpace {
 
         self.space.refresh();
         let is_dock = !self.config.expand_to_edges()
-            || self
-                .animate_state
-                .as_ref()
-                .is_some_and(|a| !(a.cur.expanded > 0.5));
+            || self.animate_state.as_ref().is_some_and(|a| !(a.cur.expanded > 0.5));
         let mut windows_left = to_map
             .iter()
             .cloned()
             .filter_map(|w| {
-                self.clients_left
-                    .lock()
-                    .unwrap()
-                    .iter()
-                    .enumerate()
-                    .find_map(|(i, c)| {
-                        let Some(t) = w.toplevel() else {
-                            return None;
-                        };
-                        if Some(c.client.id()) == t.wl_surface().client().map(|c| c.id()) {
-                            Some((i, w.clone(), c.minimize_priority))
-                        } else {
-                            None
-                        }
-                    })
+                self.clients_left.lock().unwrap().iter().enumerate().find_map(|(i, c)| {
+                    let Some(t) = w.toplevel() else {
+                        return None;
+                    };
+                    if Some(c.client.id()) == t.wl_surface().client().map(|c| c.id()) {
+                        Some((i, w.clone(), c.minimize_priority))
+                    } else {
+                        None
+                    }
+                })
             })
             .collect_vec();
         make_indices_contiguous(&mut windows_left);
@@ -115,21 +112,16 @@ impl PanelSpace {
             .iter()
             .cloned()
             .filter_map(|w| {
-                self.clients_center
-                    .lock()
-                    .unwrap()
-                    .iter()
-                    .enumerate()
-                    .find_map(|(i, c)| {
-                        let Some(t) = w.toplevel() else {
-                            return None;
-                        };
-                        if Some(c.client.id()) == t.wl_surface().client().map(|c| c.id()) {
-                            Some((i, w.clone(), c.minimize_priority))
-                        } else {
-                            None
-                        }
-                    })
+                self.clients_center.lock().unwrap().iter().enumerate().find_map(|(i, c)| {
+                    let Some(t) = w.toplevel() else {
+                        return None;
+                    };
+                    if Some(c.client.id()) == t.wl_surface().client().map(|c| c.id()) {
+                        Some((i, w.clone(), c.minimize_priority))
+                    } else {
+                        None
+                    }
+                })
             })
             .collect_vec();
         make_indices_contiguous(&mut windows_center);
@@ -138,21 +130,16 @@ impl PanelSpace {
             .iter()
             .cloned()
             .filter_map(|w| {
-                self.clients_right
-                    .lock()
-                    .unwrap()
-                    .iter()
-                    .enumerate()
-                    .find_map(|(i, c)| {
-                        let Some(t) = w.toplevel() else {
-                            return None;
-                        };
-                        if Some(c.client.id()) == t.wl_surface().client().map(|c| c.id()) {
-                            Some((i, w.clone(), c.minimize_priority))
-                        } else {
-                            None
-                        }
-                    })
+                self.clients_right.lock().unwrap().iter().enumerate().find_map(|(i, c)| {
+                    let Some(t) = w.toplevel() else {
+                        return None;
+                    };
+                    if Some(c.client.id()) == t.wl_surface().client().map(|c| c.id()) {
+                        Some((i, w.clone(), c.minimize_priority))
+                    } else {
+                        None
+                    }
+                })
             })
             .collect_vec();
         make_indices_contiguous(&mut windows_right);
@@ -214,21 +201,16 @@ impl PanelSpace {
             }
         }
 
-        let left = windows_left
-            .iter()
-            .map(|e| map_fn(e, anchor, Alignment::Left, self.scale));
+        let left = windows_left.iter().map(|e| map_fn(e, anchor, Alignment::Left, self.scale));
         let left_sum_scaled = left.clone().map(|(_, _, length, _)| length).sum::<i32>() as f64
             + spacing_scaled as f64 * windows_left.len().saturating_sub(1) as f64;
 
-        let center = windows_center
-            .iter()
-            .map(|e| map_fn(e, anchor, Alignment::Center, self.scale));
+        let center =
+            windows_center.iter().map(|e| map_fn(e, anchor, Alignment::Center, self.scale));
         let center_sum_scaled = center.clone().map(|(_, _, length, _)| length).sum::<i32>() as f64
             + spacing_scaled * windows_center.len().saturating_sub(1) as f64;
 
-        let right = windows_right
-            .iter()
-            .map(|e| map_fn(e, anchor, Alignment::Right, self.scale));
+        let right = windows_right.iter().map(|e| map_fn(e, anchor, Alignment::Right, self.scale));
         let right_sum_scaled = right.clone().map(|(_, _, length, _)| length).sum::<i32>() as f64
             + spacing_scaled * windows_right.len().saturating_sub(1) as f64;
 
@@ -372,9 +354,7 @@ impl PanelSpace {
             } else {
                 input_region.add(0, 0, new_dim.w, new_dim.h);
             }
-            layer
-                .wl_surface()
-                .set_input_region(Some(input_region.wl_region()));
+            layer.wl_surface().set_input_region(Some(input_region.wl_region()));
         }
 
         // must use logical coordinates for layout here
@@ -433,7 +413,7 @@ impl PanelSpace {
                             (x, y),
                             false,
                         );
-                    }
+                    },
                     PanelAnchor::Top | PanelAnchor::Bottom => {
                         let cur = (
                             cur,
@@ -450,7 +430,7 @@ impl PanelSpace {
                             (x, y),
                             false,
                         );
-                    }
+                    },
                 };
                 if minimize_priority.is_some() {
                     let new_rect = Rectangle {
@@ -495,20 +475,25 @@ impl PanelSpace {
 
 // if middle collides with left or right, it must be constrained
 // middle cant be constrained below 1/3 of the size of the output.
-// If the left or right extends past the min(1/3, middle), then the left or right must be constrained.
-// If there is no middle, then left and right must each be constrained to no less than 1/2. This is unlikely to happen.
+// If the left or right extends past the min(1/3, middle), then the left or
+// right must be constrained. If there is no middle, then left and right must
+// each be constrained to no less than 1/2. This is unlikely to happen.
 
 // middle constraint must go in priority order
 // applets with higher priority must be constrained first.
-// can't be constrained to be smaller than min(configured panel size suggested applet icon size * requested min, cur_applet size).
+// can't be constrained to be smaller than min(configured panel size suggested
+// applet icon size * requested min, cur_applet size).
 
-// applets that don't offer a priority are constrained last, and don't shrink, but instead are moved to the overflow popup.
-// applets that are in the overflow popup are not constrained, but are instead moved to the overflow popup space.
+// applets that don't offer a priority are constrained last, and don't shrink,
+// but instead are moved to the overflow popup. applets that are in the overflow
+// popup are not constrained, but are instead moved to the overflow popup space.
 
-// If after all constraints are applied, the panel is still too small, then the panel will move the offending applet to overflow.
+// If after all constraints are applied, the panel is still too small, then the
+// panel will move the offending applet to overflow.
 
-// When there is more space available in a section, the applets in the overflow popup will be moved back to the panel.
-// If there is still space in the panel, then the constrained applets that shrink should be unconstrained
+// When there is more space available in a section, the applets in the overflow
+// popup will be moved back to the panel. If there is still space in the panel,
+// then the constrained applets that shrink should be unconstrained
 
 // panels will now have up to 4 spaces.
 // they can have nested popups in a common use case now too.

@@ -27,7 +27,10 @@ use sctk::{
 use smithay::{
     backend::renderer::gles::GlesRenderer,
     output::Output,
-    reexports::wayland_server::{self, backend::ClientId},
+    reexports::wayland_server::{
+        backend::ClientId,
+        {self},
+    },
 };
 use tokio::sync::mpsc;
 use tracing::{error, info};
@@ -204,15 +207,13 @@ impl SpaceContainer {
         qh: &QueueHandle<GlobalState<W>>,
         force_output: Option<WlOutput>,
     ) {
-        // if the output is set to "all", we need to check if the config is the same for all outputs
-        // if the output is set to a specific output, we need to make sure it doesn't exist on another output
+        // if the output is set to "all", we need to check if the config is the same for
+        // all outputs if the output is set to a specific output, we need to
+        // make sure it doesn't exist on another output
         let mut output_count = if matches!(entry.output, CosmicPanelOuput::All) {
             self.outputs.len()
         } else {
-            self.space_list
-                .iter()
-                .filter(|s| s.config.name == entry.name)
-                .count()
+            self.space_list.iter().filter(|s| s.config.name == entry.name).count()
         };
 
         if !force_output.is_some()
@@ -244,19 +245,12 @@ impl SpaceContainer {
 
         let output_count_mismatch = match entry.output {
             CosmicPanelOuput::All => {
-                self.space_list
-                    .iter()
-                    .filter(|s| s.config.name == entry.name)
-                    .count()
+                self.space_list.iter().filter(|s| s.config.name == entry.name).count()
                     != self.outputs.len()
-            }
+            },
             CosmicPanelOuput::Name(_) => {
-                self.space_list
-                    .iter()
-                    .filter(|s| s.config.name == entry.name)
-                    .count()
-                    != 1
-            }
+                self.space_list.iter().filter(|s| s.config.name == entry.name).count() != 1
+            },
             _ => true,
         };
         let new_priority = entry.get_priority();
@@ -279,8 +273,8 @@ impl SpaceContainer {
             })
         };
         // recreate the original if: output changed
-        // or if the output is the same, but the priority changes to conflict with an adjacent panel
-        // or if applet size changes
+        // or if the output is the same, but the priority changes to conflict with an
+        // adjacent panel or if applet size changes
         let must_recreate =
         // implies that there is at least one output which needs to be recreated
         output_count_mismatch
@@ -337,7 +331,7 @@ impl SpaceContainer {
                 || force_output.is_some()
                     && s.output
                         .as_ref()
-                        .map(|(wl_output, _, _)| Some(wl_output) != force_output.as_ref())
+                        .map(|(wl_output, ..)| Some(wl_output) != force_output.as_ref())
                         .unwrap_or_default()
         });
 
@@ -376,22 +370,17 @@ impl SpaceContainer {
                     self.space_list.push(space);
                 }
                 vec![]
-            }
+            },
             CosmicPanelOuput::All => self.outputs.iter().collect(),
-            CosmicPanelOuput::Name(name) => self
-                .outputs
-                .iter()
-                .filter(|(_, output, _)| &output.name() == name)
-                .collect(),
+            CosmicPanelOuput::Name(name) => {
+                self.outputs.iter().filter(|(_, output, _)| &output.name() == name).collect()
+            },
         };
 
         let maximized_outputs = self.maximized_outputs();
         for (wl_output, output, info) in outputs {
             let output_name = output.name();
-            let has_toplevel = self
-                .toplevels
-                .iter()
-                .any(|(_, t)| t.output.contains(wl_output));
+            let has_toplevel = self.toplevels.iter().any(|(_, t)| t.output.contains(wl_output));
             if force_output.as_ref() != Some(wl_output) && force_output.is_some() {
                 continue;
             }
@@ -424,9 +413,7 @@ impl SpaceContainer {
                 self.space_list.retain(|s| {
                     // keep if the name is different or the output is different
                     s.config.name != c.name
-                        || s.output
-                            .as_ref()
-                            .is_some_and(|(_, o, _)| o.name() != output_name)
+                        || s.output.as_ref().is_some_and(|(_, o, _)| o.name() != output_name)
                 });
                 let mut new_config = (*c).clone();
                 if maximized_output {
@@ -482,9 +469,7 @@ impl SpaceContainer {
             .space_list
             .iter_mut()
             .filter(|s| {
-                s.output
-                    .as_ref()
-                    .is_some_and(|o| o.1.name().as_str() == output_id)
+                s.output.as_ref().is_some_and(|o| o.1.name().as_str() == output_id)
                     && &s.config.anchor == &anchor
             })
             .collect::<Vec<_>>();

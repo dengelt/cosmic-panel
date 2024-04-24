@@ -18,18 +18,14 @@ impl PanelSpace {
             for (p, _) in PopupManager::popups_for_surface(t.wl_surface()) {
                 match p {
                     PopupKind::Xdg(p) => {
-                        if !self
-                            .s_hovered_surface
-                            .iter()
-                            .any(|hs| &hs.surface == t.wl_surface())
-                        {
+                        if !self.s_hovered_surface.iter().any(|hs| &hs.surface == t.wl_surface()) {
                             p.send_popup_done();
                         }
-                    }
+                    },
                     PopupKind::InputMethod(_) => {
                         // TODO handle IME
                         continue;
-                    }
+                    },
                 }
             }
         }
@@ -46,10 +42,8 @@ impl PanelSpace {
             return;
         };
 
-        if let Some(p) = self
-            .popups
-            .iter_mut()
-            .find(|p| popup.wl_surface() == p.c_popup.wl_surface())
+        if let Some(p) =
+            self.popups.iter_mut().find(|p| popup.wl_surface() == p.c_popup.wl_surface())
         {
             // use the size that we have already
             p.wrapper_rectangle =
@@ -86,10 +80,10 @@ impl PanelSpace {
                     });
                     p.egl_surface.replace(egl_surface);
                     p.dirty = true;
-                }
-                popup::ConfigureKind::Reactive => {}
-                popup::ConfigureKind::Reposition { token: _token } => {}
-                _ => {}
+                },
+                popup::ConfigureKind::Reactive => {},
+                popup::ConfigureKind::Reposition { token: _token } => {},
+                _ => {},
             };
         }
     }

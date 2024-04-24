@@ -113,22 +113,13 @@ impl PanelSpace {
             let clear_color = bg_color;
             // if not visible, just clear and exit early
             let not_visible = self.config.autohide.is_some()
-                && matches!(
-                    self.visibility,
-                    xdg_shell_wrapper::space::Visibility::Hidden
-                );
-            let dim = self
-                .dimensions
-                .to_f64()
-                .to_physical(self.scale)
-                .to_i32_round();
+                && matches!(self.visibility, xdg_shell_wrapper::space::Visibility::Hidden);
+            let dim = self.dimensions.to_f64().to_physical(self.scale).to_i32_round();
             // TODO check to make sure this is not going to cause damage issues
             if not_visible {
                 if let Ok(mut frame) = renderer.render(dim, smithay::utils::Transform::Normal) {
-                    _ = frame.clear(
-                        [0.0, 0.0, 0.0, 0.0],
-                        &[Rectangle::from_loc_and_size((0, 0), dim)],
-                    );
+                    _ = frame
+                        .clear([0.0, 0.0, 0.0, 0.0], &[Rectangle::from_loc_and_size((0, 0), dim)]);
                     if let Ok(sync_point) = frame.finish() {
                         if let Err(err) = sync_point.wait() {
                             tracing::error!("Error waiting for sync point: {:?}", err);
@@ -190,11 +181,7 @@ impl PanelSpace {
 
                 _ = my_renderer.render_output(
                     renderer,
-                    self.egl_surface
-                        .as_ref()
-                        .unwrap()
-                        .buffer_age()
-                        .unwrap_or_default() as usize,
+                    self.egl_surface.as_ref().unwrap().buffer_age().unwrap_or_default() as usize,
                     &elements,
                     clear_color,
                 );
@@ -244,11 +231,7 @@ impl PanelSpace {
             );
             p.damage_tracked_renderer.render_output(
                 renderer,
-                p.egl_surface
-                    .as_ref()
-                    .unwrap()
-                    .buffer_age()
-                    .unwrap_or_default() as usize,
+                p.egl_surface.as_ref().unwrap().buffer_age().unwrap_or_default() as usize,
                 &elements,
                 clear_color,
             )?;

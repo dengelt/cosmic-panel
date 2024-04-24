@@ -63,7 +63,7 @@ impl Program for OverflowButton {
                 loop_handle.insert_idle(move |state| {
                     state.space.toggle_overflow_popup(id);
                 });
-            }
+            },
         }
         cosmic::Command::none()
     }

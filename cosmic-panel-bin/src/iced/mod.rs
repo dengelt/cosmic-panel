@@ -319,11 +319,8 @@ impl<P: Program + Send + 'static> IcedElement<P> {
 
         internal_ref.size = size;
         for (scale, (buffer, old_primitives)) in internal_ref.buffers.iter_mut() {
-            let buffer_size = internal_ref
-                .size
-                .to_f64()
-                .to_buffer(**scale, Transform::Normal)
-                .to_i32_round();
+            let buffer_size =
+                internal_ref.size.to_f64().to_buffer(**scale, Transform::Normal).to_i32_round();
             *buffer =
                 MemoryRenderBuffer::new(Fourcc::Argb8888, buffer_size, 1, Transform::Normal, None);
             *old_primitives = None;
@@ -388,7 +385,7 @@ impl<P: Program + Send + 'static> IcedElementInternal<P> {
                 &mut self.renderer,
                 &self.theme,
                 &Style {
-                    scale_factor: 1.0, //TODO: why is this
+                    scale_factor: 1.0, // TODO: why is this
                     icon_color: self.theme.cosmic().on_bg_color().into(),
                     text_color: self.theme.cosmic().on_bg_color().into(),
                 },
@@ -419,13 +416,9 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState<SpaceContainer>> for
         event: &MotionEvent,
     ) {
         let mut internal = self.0.lock().unwrap();
-        internal
-            .state
-            .queue_event(Event::Mouse(MouseEvent::CursorEntered));
+        internal.state.queue_event(Event::Mouse(MouseEvent::CursorEntered));
         let position = IcedPoint::new(event.location.x as f32, event.location.y as f32);
-        internal
-            .state
-            .queue_event(Event::Mouse(MouseEvent::CursorMoved { position }));
+        internal.state.queue_event(Event::Mouse(MouseEvent::CursorMoved { position }));
         internal.cursor_pos = Some(event.location);
         let _ = internal.update(true);
     }
@@ -438,9 +431,7 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState<SpaceContainer>> for
     ) {
         let mut internal = self.0.lock().unwrap();
         let position = IcedPoint::new(event.location.x as f32, event.location.y as f32);
-        internal
-            .state
-            .queue_event(Event::Mouse(MouseEvent::CursorMoved { position }));
+        internal.state.queue_event(Event::Mouse(MouseEvent::CursorMoved { position }));
         internal.cursor_pos = Some(event.location);
         let _ = internal.update(true);
     }
@@ -480,21 +471,13 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState<SpaceContainer>> for
         frame: AxisFrame,
     ) {
         let mut internal = self.0.lock().unwrap();
-        internal
-            .state
-            .queue_event(Event::Mouse(MouseEvent::WheelScrolled {
-                delta: if let Some(discrete) = frame.v120 {
-                    ScrollDelta::Lines {
-                        x: discrete.0 as f32 / 120.,
-                        y: discrete.1 as f32 / 120.,
-                    }
-                } else {
-                    ScrollDelta::Pixels {
-                        x: frame.axis.0 as f32,
-                        y: frame.axis.1 as f32,
-                    }
-                },
-            }));
+        internal.state.queue_event(Event::Mouse(MouseEvent::WheelScrolled {
+            delta: if let Some(discrete) = frame.v120 {
+                ScrollDelta::Lines { x: discrete.0 as f32 / 120., y: discrete.1 as f32 / 120. }
+            } else {
+                ScrollDelta::Pixels { x: frame.axis.0 as f32, y: frame.axis.1 as f32 }
+            },
+        }));
         let _ = internal.update(true);
     }
 
@@ -513,9 +496,7 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState<SpaceContainer>> for
         _time: u32,
     ) {
         let mut internal = self.0.lock().unwrap();
-        internal
-            .state
-            .queue_event(Event::Mouse(MouseEvent::CursorLeft));
+        internal.state.queue_event(Event::Mouse(MouseEvent::CursorLeft));
         let _ = internal.update(true);
     }
 
@@ -526,6 +507,7 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState<SpaceContainer>> for
         _: &GestureSwipeBeginEvent,
     ) {
     }
+
     fn gesture_swipe_update(
         &self,
         _: &Seat<GlobalState<SpaceContainer>>,
@@ -533,6 +515,7 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState<SpaceContainer>> for
         _: &GestureSwipeUpdateEvent,
     ) {
     }
+
     fn gesture_swipe_end(
         &self,
         _: &Seat<GlobalState<SpaceContainer>>,
@@ -540,6 +523,7 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState<SpaceContainer>> for
         _: &GestureSwipeEndEvent,
     ) {
     }
+
     fn gesture_pinch_begin(
         &self,
         _: &Seat<GlobalState<SpaceContainer>>,
@@ -547,6 +531,7 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState<SpaceContainer>> for
         _: &GesturePinchBeginEvent,
     ) {
     }
+
     fn gesture_pinch_update(
         &self,
         _: &Seat<GlobalState<SpaceContainer>>,
@@ -554,6 +539,7 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState<SpaceContainer>> for
         _: &GesturePinchUpdateEvent,
     ) {
     }
+
     fn gesture_pinch_end(
         &self,
         _: &Seat<GlobalState<SpaceContainer>>,
@@ -561,6 +547,7 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState<SpaceContainer>> for
         _: &GesturePinchEndEvent,
     ) {
     }
+
     fn gesture_hold_begin(
         &self,
         _: &Seat<GlobalState<SpaceContainer>>,
@@ -568,6 +555,7 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState<SpaceContainer>> for
         _: &GestureHoldBeginEvent,
     ) {
     }
+
     fn gesture_hold_end(
         &self,
         _: &Seat<GlobalState<SpaceContainer>>,
@@ -630,9 +618,7 @@ impl<P: Program + Send + 'static> KeyboardTarget<GlobalState<SpaceContainer>> fo
         if modifiers.logo {
             mods.insert(IcedModifiers::LOGO);
         }
-        internal
-            .state
-            .queue_event(Event::Keyboard(KeyboardEvent::ModifiersChanged(mods)));
+        internal.state.queue_event(Event::Keyboard(KeyboardEvent::ModifiersChanged(mods)));
         let _ = internal.update(true);
     }
 }
@@ -656,11 +642,7 @@ impl<P: Program + Send + 'static> SpaceElement for IcedElement<P> {
         let mut internal = self.0.lock().unwrap();
         internal.state.queue_event(Event::Window(
             Id::MAIN,
-            if activated {
-                WindowEvent::Focused
-            } else {
-                WindowEvent::Unfocused
-            },
+            if activated { WindowEvent::Focused } else { WindowEvent::Unfocused },
         ));
         let _ = internal.update(true); // TODO
     }
@@ -669,11 +651,8 @@ impl<P: Program + Send + 'static> SpaceElement for IcedElement<P> {
         let mut internal = self.0.lock().unwrap();
         let scale = output.current_scale().fractional_scale();
         if !internal.buffers.contains_key(&OrderedFloat(scale)) {
-            let buffer_size = internal
-                .size
-                .to_f64()
-                .to_buffer(scale, Transform::Normal)
-                .to_i32_round();
+            let buffer_size =
+                internal.size.to_f64().to_buffer(scale, Transform::Normal).to_i32_round();
             internal.buffers.insert(
                 OrderedFloat(scale),
                 (
@@ -706,10 +685,7 @@ impl<P: Program + Send + 'static> SpaceElement for IcedElement<P> {
         // makes partial borrows easier
         let internal_ref = &mut *internal;
         internal_ref.buffers.retain(|scale, _| {
-            internal_ref
-                .outputs
-                .iter()
-                .any(|o| o.current_scale().fractional_scale() == **scale)
+            internal_ref.outputs.iter().any(|o| o.current_scale().fractional_scale() == **scale)
         });
         for scale in internal_ref
             .outputs
@@ -719,11 +695,8 @@ impl<P: Program + Send + 'static> SpaceElement for IcedElement<P> {
             .collect::<Vec<_>>()
             .into_iter()
         {
-            let buffer_size = internal_ref
-                .size
-                .to_f64()
-                .to_buffer(*scale, Transform::Normal)
-                .to_i32_round();
+            let buffer_size =
+                internal_ref.size.to_f64().to_buffer(*scale, Transform::Normal).to_i32_round();
             internal_ref.buffers.insert(
                 scale,
                 (
@@ -773,11 +746,8 @@ where
         if let Some((buffer, ref mut old_primitives)) =
             internal_ref.buffers.get_mut(&OrderedFloat(scale.x))
         {
-            let size: Size<i32, BufferCoords> = internal_ref
-                .size
-                .to_f64()
-                .to_buffer(scale.x, Transform::Normal)
-                .to_i32_round();
+            let size: Size<i32, BufferCoords> =
+                internal_ref.size.to_f64().to_buffer(scale.x, Transform::Normal).to_i32_round();
 
             if size.w > 0 && size.h > 0 {
                 let IcedRenderer::TinySkia(renderer) = &mut internal_ref.renderer;
@@ -833,10 +803,7 @@ where
                                 })
                                 .collect::<Vec<_>>();
 
-                            state_ref
-                                .program()
-                                .0
-                                .foreground(&mut pixels, &damage, scale.x as f32);
+                            state_ref.program().0.foreground(&mut pixels, &damage, scale.x as f32);
 
                             Result::<_, ()>::Ok(damage)
                         })

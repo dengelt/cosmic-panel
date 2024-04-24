@@ -30,40 +30,33 @@ use smithay::{
     backend::{
         egl::{
             context::{GlAttributes, PixelFormatRequirements},
+            display::EGLDisplay,
             ffi::egl::SwapInterval,
+            surface::EGLSurface,
             EGLContext,
         },
-        renderer::{damage::OutputDamageTracker, Bind, Unbind},
+        renderer::{damage::OutputDamageTracker, gles::GlesRenderer, Bind, Unbind},
     },
+    desktop::{PopupManager, Space, Window},
     output::Output,
     reexports::{
         wayland_protocols::xdg::shell::client::xdg_positioner::{Anchor, Gravity},
-        wayland_server::{backend::ClientId, DisplayHandle},
+        wayland_server::{backend::ClientId, Client, DisplayHandle},
     },
-    utils::Rectangle,
+    utils::{Logical, Rectangle, Size},
     wayland::{
         seat::WaylandFocus,
         shell::xdg::{PopupSurface, PositionerState},
     },
 };
-use smithay::{
-    backend::{
-        egl::{display::EGLDisplay, surface::EGLSurface},
-        renderer::gles::GlesRenderer,
-    },
-    desktop::{PopupManager, Space, Window},
-    reexports::wayland_server::Client,
-    utils::{Logical, Size},
-};
 use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info};
 use wayland_egl::WlEglSurface;
-use wayland_protocols::wp::viewporter::client::wp_viewport::WpViewport;
 use wayland_protocols::wp::{
     fractional_scale::v1::client::wp_fractional_scale_v1::WpFractionalScaleV1,
     security_context::v1::client::wp_security_context_v1::WpSecurityContextV1,
+    viewporter::client::wp_viewport::WpViewport,
 };
-use xdg_shell_wrapper::wp_security_context::SecurityContextManager;
 use xdg_shell_wrapper::{
     client_state::{ClientFocus, FocusStatus},
     server_state::{ServerFocus, ServerPtrFocus},
@@ -72,6 +65,7 @@ use xdg_shell_wrapper::{
         ClientEglDisplay, ClientEglSurface, SpaceEvent, Visibility, WrapperPopup, WrapperSpace,
     },
     util::smootherstep,
+    wp_security_context::SecurityContextManager,
 };
 
 use cosmic_panel_config::{CosmicPanelBackground, CosmicPanelConfig, PanelAnchor};
@@ -336,10 +330,7 @@ impl PanelSpace {
             "panel-{}-{}-{}",
             self.config.name,
             self.config.output,
-            self.output
-                .as_ref()
-                .map(|o| o.2.name.clone().unwrap_or_default())
-                .unwrap_or_default()
+            self.output.as_ref().map(|o| o.2.name.clone().unwrap_or_default()).unwrap_or_default()
         );
         id
     }
@@ -355,12 +346,9 @@ impl PanelSpace {
             let c_focused_surface = self.c_focused_surface.borrow();
             let c_hovered_surface = self.c_hovered_surface.borrow();
             // no transition if not configured for autohide
-            let no_hover_focus = c_focused_surface
-                .iter()
-                .all(|f| matches!(f.2, FocusStatus::LastFocused(_)))
-                && c_hovered_surface
-                    .iter()
-                    .all(|f| matches!(f.2, FocusStatus::LastFocused(_)));
+            let no_hover_focus =
+                c_focused_surface.iter().all(|f| matches!(f.2, FocusStatus::LastFocused(_)))
+                    && c_hovered_surface.iter().all(|f| matches!(f.2, FocusStatus::LastFocused(_)));
             if self.config.autohide().is_none() {
                 if no_hover_focus && self.animate_state.is_none() {
                     self.additional_gap = 0;
@@ -378,16 +366,10 @@ impl PanelSpace {
                     FocusStatus::LastFocused(self.start_instant)
                 },
                 |acc, (surface, _, f)| {
-                    if self
-                        .layer
-                        .as_ref()
-                        .is_some_and(|s| *s.wl_surface() == *surface)
+                    if self.layer.as_ref().is_some_and(|s| *s.wl_surface() == *surface)
                         || self.popups.iter().any(|p| {
                             &p.c_popup.wl_surface() == &surface
-                                || self
-                                    .popups
-                                    .iter()
-                                    .any(|p| p.c_popup.wl_surface() == surface)
+                                || self.popups.iter().any(|p| p.c_popup.wl_surface() == surface)
                         })
                     {
                         match (&acc, &f) {
@@ -397,7 +379,7 @@ impl PanelSpace {
                                 } else {
                                     acc
                                 }
-                            }
+                            },
                             (FocusStatus::LastFocused(_), FocusStatus::Focused) => *f,
                             _ => acc,
                         }
@@ -423,7 +405,7 @@ impl PanelSpace {
                         prev_margin: margin,
                     }
                 }
-            }
+            },
             Visibility::Visible => {
                 if let FocusStatus::LastFocused(t) = cur_hover {
                     // start transition to hidden
@@ -439,12 +421,8 @@ impl PanelSpace {
                         }
                     }
                 }
-            }
-            Visibility::TransitionToHidden {
-                last_instant,
-                progress,
-                prev_margin,
-            } => {
+            },
+            Visibility::TransitionToHidden { last_instant, progress, prev_margin } => {
                 let now = Instant::now();
                 let total_t = self.config.get_hide_transition().unwrap();
                 let delta_t = match now.checked_duration_since(last_instant) {
@@ -515,12 +493,8 @@ impl PanelSpace {
                         };
                     }
                 }
-            }
-            Visibility::TransitionToVisible {
-                last_instant,
-                progress,
-                prev_margin,
-            } => {
+            },
+            Visibility::TransitionToVisible { last_instant, progress, prev_margin } => {
                 let now = Instant::now();
                 let total_t = self.config.get_hide_transition().unwrap();
                 let delta_t = match now.checked_duration_since(last_instant) {
@@ -589,7 +563,7 @@ impl PanelSpace {
                         };
                     }
                 }
-            }
+            },
         }
         return;
     }
@@ -605,16 +579,16 @@ impl PanelSpace {
         match anchor {
             PanelAnchor::Left => {
                 layer_surface.set_margin(margin, 0, margin, target + additional_gap)
-            }
+            },
             PanelAnchor::Right => {
                 layer_surface.set_margin(margin, target + additional_gap, margin, 0)
-            }
+            },
             PanelAnchor::Top => {
                 layer_surface.set_margin(target + additional_gap, margin, 0, margin)
-            }
+            },
             PanelAnchor::Bottom => {
                 layer_surface.set_margin(0, margin, target + additional_gap, margin)
-            }
+            },
         };
     }
 
@@ -630,15 +604,12 @@ impl PanelSpace {
             .output
             .as_ref()
             .and_then(|(_, _, info)| {
-                info.modes
-                    .iter()
-                    .find_map(|m| if m.current { Some(m.dimensions) } else { None })
+                info.modes.iter().find_map(|m| if m.current { Some(m.dimensions) } else { None })
             })
             .map(|(w, h)| (w as u32, h as u32));
 
         let (constrained_w, constrained_h) =
-            self.config
-                .get_dimensions(output_dims, self.suggested_length, active_gap);
+            self.config.get_dimensions(output_dims, self.suggested_length, active_gap);
         if let Some(w_range) = constrained_w {
             w = w.clamp(w_range.start as i32, w_range.end as i32 - 1);
         }
@@ -652,17 +623,13 @@ impl PanelSpace {
     fn apply_animation_state(&mut self) {
         if let Some(animation_state) = self.animate_state.as_mut() {
             self.damage_tracked_renderer = Some(OutputDamageTracker::new(
-                self.dimensions
-                    .to_f64()
-                    .to_physical(self.scale)
-                    .to_i32_round(),
+                self.dimensions.to_f64().to_physical(self.scale).to_i32_round(),
                 1.0,
                 smithay::utils::Transform::Flipped180,
             ));
             self.panel_changed = true;
-            let progress = (Instant::now()
-                .duration_since(animation_state.started_at)
-                .as_millis() as f32)
+            let progress = (Instant::now().duration_since(animation_state.started_at).as_millis()
+                as f32)
                 / animation_state.duration.as_millis() as f32;
             self.is_dirty = true;
             if progress >= 1.0 {
@@ -749,18 +716,10 @@ impl PanelSpace {
         match self.space_event.take() {
             Some(SpaceEvent::Quit) => {
                 info!("root layer shell surface removed.");
-            }
-            Some(SpaceEvent::WaitConfigure {
-                first,
-                width,
-                height,
-            }) => {
-                self.space_event.replace(Some(SpaceEvent::WaitConfigure {
-                    first,
-                    width,
-                    height,
-                }));
-            }
+            },
+            Some(SpaceEvent::WaitConfigure { first, width, height }) => {
+                self.space_event.replace(Some(SpaceEvent::WaitConfigure { first, width, height }));
+            },
             None => {
                 if let (Some(size), Some(layer_surface)) =
                     (self.pending_dimensions.take(), self.layer.as_ref())
@@ -778,10 +737,7 @@ impl PanelSpace {
                     };
 
                     if self.config.autohide.is_none() && self.config.exclusive_zone() {
-                        self.layer
-                            .as_ref()
-                            .unwrap()
-                            .set_exclusive_zone(list_thickness as i32);
+                        self.layer.as_ref().unwrap().set_exclusive_zone(list_thickness as i32);
                         if self.config.get_effective_anchor_gap() > 0 {
                             Self::set_margin(
                                 self.config.anchor,
@@ -820,13 +776,12 @@ impl PanelSpace {
                         true
                     };
                 }
-            }
+            },
         }
 
         if let Some(renderer) = renderer.as_mut() {
             let prev = self.popups.len();
-            self.popups
-                .retain_mut(|p: &mut WrapperPopup| p.handle_events(popup_manager));
+            self.popups.retain_mut(|p: &mut WrapperPopup| p.handle_events(popup_manager));
 
             if prev == self.popups.len() && should_render {
                 if let Err(e) = self.render(renderer, time, qh) {
@@ -858,11 +813,7 @@ impl PanelSpace {
         let (w, h) = configure.new_size;
         match self.space_event.take() {
             Some(e) => match e {
-                SpaceEvent::WaitConfigure {
-                    first,
-                    mut width,
-                    mut height,
-                } => {
+                SpaceEvent::WaitConfigure { first, mut width, mut height } => {
                     if w != 0 {
                         width = w as i32;
                         if self.config.is_horizontal() {
@@ -997,7 +948,7 @@ impl PanelSpace {
                         1.0,
                         smithay::utils::Transform::Flipped180,
                     ));
-                }
+                },
                 SpaceEvent::Quit => (),
             },
             None => {
@@ -1021,10 +972,8 @@ impl PanelSpace {
                 if height == 0 {
                     height = 1;
                 }
-                let dim = self.constrain_dim(
-                    (width as i32, height as i32).into(),
-                    Some(self.gap() as u32),
-                );
+                let dim = self
+                    .constrain_dim((width as i32, height as i32).into(), Some(self.gap() as u32));
 
                 if let (Some(renderer), Some(egl_surface)) =
                     (renderer.as_mut(), self.egl_surface.as_ref())
@@ -1044,7 +993,7 @@ impl PanelSpace {
                     1.0,
                     smithay::utils::Transform::Flipped180,
                 ));
-            }
+            },
         }
     }
 
@@ -1066,11 +1015,7 @@ impl PanelSpace {
             let start = AnimatableState {
                 bg_color: self.bg_color,
                 border_radius: self.config.border_radius,
-                expanded: if self.config.expand_to_edges {
-                    1.0
-                } else {
-                    0.0
-                },
+                expanded: if self.config.expand_to_edges { 1.0 } else { 0.0 },
                 gap: self.gap(),
             };
             let cur = start.clone();
@@ -1093,10 +1038,7 @@ impl PanelSpace {
         self.is_dirty = true;
         self.popups.clear();
         self.damage_tracked_renderer = Some(OutputDamageTracker::new(
-            self.dimensions
-                .to_f64()
-                .to_physical(self.scale)
-                .to_i32_round(),
+            self.dimensions.to_f64().to_physical(self.scale).to_i32_round(),
             1.0,
             smithay::utils::Transform::Flipped180,
         ));
@@ -1119,18 +1061,14 @@ impl PanelSpace {
             parent_size,
             parent_configure: _,
         } = pos_state;
-        let p_offset = if let Some(s) = self.space.elements().find(|w| {
-            s_surface
-                .get_parent_surface()
-                .is_some_and(|s| w.wl_surface() == Some(s))
-        }) {
-            self.space
-                .element_location(s)
-                .unwrap_or_else(|| (0, 0).into())
+        let p_offset = if let Some(s) = self
+            .space
+            .elements()
+            .find(|w| s_surface.get_parent_surface().is_some_and(|s| w.wl_surface() == Some(s)))
+        {
+            self.space.element_location(s).unwrap_or_else(|| (0, 0).into())
         } else if let Some(p) = self.popups.iter().find(|p| {
-            s_surface
-                .get_parent_surface()
-                .is_some_and(|s| &s == p.s_surface.wl_surface())
+            s_surface.get_parent_surface().is_some_and(|s| &s == p.s_surface.wl_surface())
         }) {
             // panic!("Popup parent surface not found in space");
             p.rectangle.loc
@@ -1214,7 +1152,10 @@ impl PanelSpace {
         // return early
         if config.anchor() != self.config.anchor() {
             if config.is_horizontal() != self.config.is_horizontal() {
-                panic!("Can't apply anchor changes when orientation changes. Requires re-creation of the panel.");
+                panic!(
+                    "Can't apply anchor changes when orientation changes. Requires re-creation of \
+                     the panel."
+                );
             }
             if let Some(l) = self.layer.as_ref() {
                 l.set_anchor(config.anchor().into());
@@ -1253,11 +1194,7 @@ impl PanelSpace {
             let start = AnimatableState {
                 bg_color: self.bg_color,
                 border_radius: self.config.border_radius,
-                expanded: if self.config.expand_to_edges {
-                    1.0
-                } else {
-                    0.0
-                },
+                expanded: if self.config.expand_to_edges { 1.0 } else { 0.0 },
                 gap: self.gap(),
             };
             let end = AnimatableState {

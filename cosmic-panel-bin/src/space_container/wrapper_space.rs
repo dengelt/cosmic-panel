@@ -65,7 +65,8 @@ impl WrapperSpace for SpaceContainer {
         self.connection = Some(conn.clone());
         self.security_context_manager = security_context_manager.clone();
 
-        // create a space for each config profile which is configured for Active output and call setup on each
+        // create a space for each config profile which is configured for Active output
+        // and call setup on each
         self.space_list.append(
             &mut self
                 .config
@@ -157,14 +158,14 @@ impl WrapperSpace for SpaceContainer {
             Some(n) => n,
             None => anyhow::bail!("Output missing name"),
         };
-        self.outputs
-            .push((c_output.clone(), s_output.clone(), output_info.clone()));
+        self.outputs.push((c_output.clone(), s_output.clone(), output_info.clone()));
 
         let cur = self.cur_bg_color();
         let dark = self.dark_bg;
         let light = self.light_bg;
         // TODO error handling
-        // create the spaces that are configured to use this output, including spaces configured for All
+        // create the spaces that are configured to use this output, including spaces
+        // configured for All
         let mut new_spaces = self
             .config
             .configs_for_output(&output_name)
@@ -233,7 +234,7 @@ impl WrapperSpace for SpaceContainer {
                         } else {
                             None
                         }
-                    }
+                    },
                     CosmicPanelOuput::Name(name) if name == &output_name => {
                         let mut s = if let Some(s) = self.space_list.iter_mut().position(|s| {
                             s.config.name == config.name && config.output == s.config.output
@@ -280,7 +281,7 @@ impl WrapperSpace for SpaceContainer {
                         } else {
                             None
                         }
-                    }
+                    },
                     _ => None,
                 }
             })
@@ -300,9 +301,7 @@ impl WrapperSpace for SpaceContainer {
 
     fn add_window(&mut self, s_top_level: smithay::desktop::Window) {
         // add window to the space with a client that matches the window
-        let w_client = s_top_level
-            .toplevel()
-            .and_then(|t| t.wl_surface().client().map(|c| c.id()));
+        let w_client = s_top_level.toplevel().and_then(|t| t.wl_surface().client().map(|c| c.id()));
 
         if let Some(space) = self.space_list.iter_mut().find(|space| {
             space
@@ -314,7 +313,6 @@ impl WrapperSpace for SpaceContainer {
                 .chain(space.clients_right.lock().unwrap().iter())
                 .any(|c| Some(c.client.id()) == w_client)
         }) {
-            
             space.add_window(s_top_level);
         }
     }
@@ -476,8 +474,10 @@ impl WrapperSpace for SpaceContainer {
         self.renderer.as_mut()
     }
 
-    // all pointer / keyboard handling should be called on any space with an active popup first, then on the rest
-    // Eg: likely opening a popup on one panel, then without clicking anywhere else, opening a popup on another panel will crash
+    // all pointer / keyboard handling should be called on any space with an active
+    // popup first, then on the rest Eg: likely opening a popup on one panel,
+    // then without clicking anywhere else, opening a popup on another panel will
+    // crash
     fn update_pointer(
         &mut self,
         dim: (i32, i32),
@@ -485,11 +485,8 @@ impl WrapperSpace for SpaceContainer {
         c_wl_surface: c_wl_surface::WlSurface,
     ) -> Option<ServerPointerFocus> {
         let mut anchor_output = None;
-        let ret = if let Some((popup_space_i, popup_space)) = self
-            .space_list
-            .iter_mut()
-            .enumerate()
-            .find(|s| !s.1.popups.is_empty())
+        let ret = if let Some((popup_space_i, popup_space)) =
+            self.space_list.iter_mut().enumerate().find(|s| !s.1.popups.is_empty())
         {
             if let Some(p_ret) = popup_space.update_pointer(dim, seat_name, c_wl_surface.clone()) {
                 anchor_output = Some((
@@ -538,9 +535,8 @@ impl WrapperSpace for SpaceContainer {
                 }
                 let hovered = s.c_hovered_surface.clone();
                 let mut guard = hovered.borrow_mut();
-                if let Some(f) = guard
-                    .iter_mut()
-                    .find(|f| space_c_wl_surface == &f.0 && f.1 == seat_name)
+                if let Some(f) =
+                    guard.iter_mut().find(|f| space_c_wl_surface == &f.0 && f.1 == seat_name)
                 {
                     f.2 = FocusStatus::Focused;
                 } else {
@@ -563,11 +559,8 @@ impl WrapperSpace for SpaceContainer {
     }
 
     fn handle_button(&mut self, seat_name: &str, press: bool) -> Option<wl_surface::WlSurface> {
-        if let Some((popup_space_i, popup_space)) = self
-            .space_list
-            .iter_mut()
-            .enumerate()
-            .find(|(_, s)| !s.popups.is_empty())
+        if let Some((popup_space_i, popup_space)) =
+            self.space_list.iter_mut().enumerate().find(|(_, s)| !s.popups.is_empty())
         {
             if let Some(p_ret) = popup_space.handle_button(seat_name, press) {
                 Some(p_ret)
@@ -581,18 +574,13 @@ impl WrapperSpace for SpaceContainer {
                 })
             }
         } else {
-            self.space_list
-                .iter_mut()
-                .find_map(|s| s.handle_button(seat_name, press))
+            self.space_list.iter_mut().find_map(|s| s.handle_button(seat_name, press))
         }
     }
 
     fn keyboard_leave(&mut self, seat_name: &str, surface: Option<c_wl_surface::WlSurface>) {
-        if let Some((popup_space_i, popup_space)) = self
-            .space_list
-            .iter_mut()
-            .enumerate()
-            .find(|(_, s)| !s.popups.is_empty())
+        if let Some((popup_space_i, popup_space)) =
+            self.space_list.iter_mut().enumerate().find(|(_, s)| !s.popups.is_empty())
         {
             popup_space.keyboard_leave(seat_name, surface.clone());
             for (i, s) in &mut self.space_list.iter_mut().enumerate() {
@@ -612,11 +600,8 @@ impl WrapperSpace for SpaceContainer {
         seat_name: &str,
         surface: c_wl_surface::WlSurface,
     ) -> Option<wl_surface::WlSurface> {
-        if let Some((popup_space_i, popup_space)) = self
-            .space_list
-            .iter_mut()
-            .enumerate()
-            .find(|(_, s)| !s.popups.is_empty())
+        if let Some((popup_space_i, popup_space)) =
+            self.space_list.iter_mut().enumerate().find(|(_, s)| !s.popups.is_empty())
         {
             if let Some(p_ret) = popup_space.keyboard_enter(seat_name, surface.clone()) {
                 Some(p_ret);
@@ -629,25 +614,18 @@ impl WrapperSpace for SpaceContainer {
                 }
             })
         } else {
-            self.space_list
-                .iter_mut()
-                .find_map(|s| s.keyboard_enter(seat_name, surface.clone()))
+            self.space_list.iter_mut().find_map(|s| s.keyboard_enter(seat_name, surface.clone()))
         }
     }
 
     fn pointer_leave(&mut self, seat_name: &str, surface: Option<c_wl_surface::WlSurface>) {
         let mut output_anchor = None;
-        if let Some((popup_space_i, popup_space)) = self
-            .space_list
-            .iter_mut()
-            .enumerate()
-            .find(|(_, s)| !s.popups.is_empty())
+        if let Some((popup_space_i, popup_space)) =
+            self.space_list.iter_mut().enumerate().find(|(_, s)| !s.popups.is_empty())
         {
             popup_space.pointer_leave(seat_name, surface.clone());
-            output_anchor = popup_space
-                .output
-                .as_ref()
-                .map(|o| (o.1.name(), popup_space.config.anchor));
+            output_anchor =
+                popup_space.output.as_ref().map(|o| (o.1.name(), popup_space.config.anchor));
             for (i, s) in &mut self.space_list.iter_mut().enumerate() {
                 if i != popup_space_i {
                     s.pointer_leave(seat_name, None)
@@ -659,10 +637,7 @@ impl WrapperSpace for SpaceContainer {
                 .zip(s.layer.as_ref().map(|l| l.wl_surface()))
                 .is_some_and(|(s, l)| s == l)
         }) {
-            output_anchor = space
-                .output
-                .as_ref()
-                .map(|o| (o.1.name(), space.config.anchor));
+            output_anchor = space.output.as_ref().map(|o| (o.1.name(), space.config.anchor));
             for s in &mut self.space_list {
                 s.pointer_leave(seat_name, None);
             }
@@ -693,11 +668,8 @@ impl WrapperSpace for SpaceContainer {
         seat_name: &str,
         c_wl_surface: c_wl_surface::WlSurface,
     ) -> Option<ServerPointerFocus> {
-        if let Some((popup_space_i, popup_space)) = self
-            .space_list
-            .iter_mut()
-            .enumerate()
-            .find(|(_, s)| !s.popups.is_empty())
+        if let Some((popup_space_i, popup_space)) =
+            self.space_list.iter_mut().enumerate().find(|(_, s)| !s.popups.is_empty())
         {
             if let Some(p_ret) = popup_space.pointer_enter(dim, seat_name, c_wl_surface.clone()) {
                 Some(p_ret)
@@ -722,11 +694,11 @@ impl WrapperSpace for SpaceContainer {
         popup: &sctk::shell::xdg::popup::Popup,
         config: sctk::shell::xdg::popup::PopupConfigure,
     ) {
-        if let Some(space) = self.space_list.iter_mut().find(|s| {
-            s.popups
-                .iter()
-                .any(|p| p.c_popup.wl_surface() == popup.wl_surface())
-        }) {
+        if let Some(space) = self
+            .space_list
+            .iter_mut()
+            .find(|s| s.popups.iter().any(|p| p.c_popup.wl_surface() == popup.wl_surface()))
+        {
             space.configure_panel_popup(popup, config, self.renderer.as_mut());
         }
     }
@@ -753,11 +725,11 @@ impl WrapperSpace for SpaceContainer {
     fn raise_window(&mut self, _: &smithay::desktop::Window, _: bool) {}
 
     fn close_popup(&mut self, popup: &sctk::shell::xdg::popup::Popup) {
-        if let Some(space) = self.space_list.iter_mut().find(|s| {
-            s.popups
-                .iter()
-                .any(|p| p.c_popup.wl_surface() == popup.wl_surface())
-        }) {
+        if let Some(space) = self
+            .space_list
+            .iter_mut()
+            .find(|s| s.popups.iter().any(|p| p.c_popup.wl_surface() == popup.wl_surface()))
+        {
             space.close_popup(popup);
         }
     }
@@ -770,10 +742,7 @@ impl WrapperSpace for SpaceContainer {
         {
             space.configure_panel_layer(layer, configure, &mut self.renderer);
             if matches!(space.visibility(), Visibility::Visible) || !space.output_has_toplevel {
-                space
-                    .output
-                    .as_ref()
-                    .map(|o| (o.1.name(), space.config.anchor));
+                space.output.as_ref().map(|o| (o.1.name(), space.config.anchor));
             }
         }
         self.apply_toplevel_changes()
@@ -790,8 +759,7 @@ impl WrapperSpace for SpaceContainer {
         _s_output: Output,
     ) -> anyhow::Result<()> {
         self.outputs.retain(|o| o.0 != c_output);
-        self.space_list
-            .retain(|s| s.output.as_ref().map(|o| &o.0) != Some(&c_output));
+        self.space_list.retain(|s| s.output.as_ref().map(|o| &o.0) != Some(&c_output));
         Ok(())
     }
 
@@ -802,8 +770,7 @@ impl WrapperSpace for SpaceContainer {
         info: OutputInfo,
     ) -> anyhow::Result<bool> {
         self.outputs.retain(|o| o.0 != c_output);
-        self.outputs
-            .push((c_output.clone(), s_output.clone(), info.clone()));
+        self.outputs.push((c_output.clone(), s_output.clone(), info.clone()));
         let mut found = false;
         for s in &mut self.space_list {
             if s.output.as_ref().map(|o| &o.0) == Some(&c_output) {
