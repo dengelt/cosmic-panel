@@ -357,6 +357,12 @@ impl WrapperSpace for PanelSpace {
                                 panel_client.exec = Some(exec.to_string());
                                 panel_client.requests_wayland_display =
                                     Some(entry.desktop_entry("X-HostWaylandDisplay").is_some());
+                                panel_client.shrink_min_size = entry
+                                    .desktop_entry("X-OverflowMinSize")
+                                    .and_then(|x| x.parse::<u32>().ok());
+                                panel_client.shrink_priority = entry
+                                    .desktop_entry("X-OverflowPriority")
+                                    .and_then(|x| x.parse::<u32>().ok());
 
                                 panel_client.minimize_priority = if let Some(x_minimize_entry) =
                                     entry.desktop_entry("X-MinimizeApplet")
@@ -429,9 +435,6 @@ impl WrapperSpace for PanelSpace {
                     "X_MINIMIZE_APPLET".to_string(),
                     panel_client.minimize_priority.is_some().to_string(),
                 ));
-                if panel_client.name == "com.system76.CosmicAppletNetwork" {
-                    applet_env.push(("WAYLAND_DEBUG".to_string(), "1".to_string()));
-                }
                 if requests_wayland_display {
                     if let Some(security_context_manager) = security_context_manager.as_ref() {
                         match security_context_manager.create_listener::<W>(qh) {

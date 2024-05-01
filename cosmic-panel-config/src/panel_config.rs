@@ -175,6 +175,10 @@ impl PanelSize {
             }
         }
     }
+
+    pub fn get_applet_icon_size_with_padding(&self, is_symbolic: bool) -> u32 {
+        self.get_applet_icon_size(is_symbolic) + self.get_applet_padding(is_symbolic) as u32 * 2
+    }
 }
 
 impl Display for PanelSize {

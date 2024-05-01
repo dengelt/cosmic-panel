@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{num::NonZeroU32, time::Duration};
 
 use crate::iced::elements::CosmicMappedInternal;
 
@@ -15,7 +15,7 @@ use smithay::{
         element::{
             memory::MemoryRenderBufferRenderElement,
             surface::{render_elements_from_surface_tree, WaylandSurfaceRenderElement},
-            RenderElement, UnderlyingStorage,
+            Element, RenderElement, UnderlyingStorage,
         },
         gles::{GlesError, GlesFrame, GlesRenderer},
         Bind, Frame, Renderer, Unbind,
@@ -24,7 +24,11 @@ use smithay::{
 };
 use xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 pub(crate) enum PanelRenderElement {
-    Wayland(WaylandSurfaceRenderElement<GlesRenderer>),
+    Wayland(
+        WaylandSurfaceRenderElement<GlesRenderer>,
+        Rectangle<f64, Buffer>,
+        Rectangle<i32, Physical>,
+    ),
     RoundedRectangle(RoundedRectangleShaderElement),
     OverflowMenu(MemoryRenderBufferRenderElement<GlesRenderer>),
 }
@@ -32,7 +36,7 @@ pub(crate) enum PanelRenderElement {
 impl smithay::backend::renderer::element::Element for PanelRenderElement {
     fn id(&self) -> &smithay::backend::renderer::element::Id {
         match self {
-            Self::Wayland(e) => e.id(),
+            Self::Wayland(e, ..) => e.id(),
             Self::RoundedRectangle(e) => e.id(),
             Self::OverflowMenu(e) => e.id(),
         }
@@ -40,7 +44,7 @@ impl smithay::backend::renderer::element::Element for PanelRenderElement {
 
     fn current_commit(&self) -> smithay::backend::renderer::utils::CommitCounter {
         match self {
-            Self::Wayland(e) => e.current_commit(),
+            Self::Wayland(e, ..) => e.current_commit(),
             Self::RoundedRectangle(e) => e.current_commit(),
             Self::OverflowMenu(e) => e.current_commit(),
         }
@@ -48,7 +52,7 @@ impl smithay::backend::renderer::element::Element for PanelRenderElement {
 
     fn src(&self) -> Rectangle<f64, Buffer> {
         match self {
-            Self::Wayland(e) => e.src(),
+            Self::Wayland(e, src, ..) => *src,
             Self::RoundedRectangle(e) => e.src(),
             Self::OverflowMenu(e) => e.src(),
         }
@@ -56,7 +60,7 @@ impl smithay::backend::renderer::element::Element for PanelRenderElement {
 
     fn geometry(&self, scale: smithay::utils::Scale<f64>) -> Rectangle<i32, Physical> {
         match self {
-            Self::Wayland(e) => e.geometry(scale),
+            Self::Wayland(e, _, geo) => *geo,
             Self::RoundedRectangle(e) => e.geometry(scale),
             Self::OverflowMenu(e) => e.geometry(scale),
         }
@@ -72,7 +76,7 @@ impl RenderElement<GlesRenderer> for PanelRenderElement {
         damage: &[Rectangle<i32, Physical>],
     ) -> Result<(), GlesError> {
         match self {
-            Self::Wayland(e) => e.draw(frame, src, dst, damage),
+            Self::Wayland(e, ..) => e.draw(frame, src, dst, damage),
             Self::RoundedRectangle(e) => e.draw(frame, src, dst, damage),
             Self::OverflowMenu(e) => e.draw(frame, src, dst, damage),
         }
@@ -80,7 +84,7 @@ impl RenderElement<GlesRenderer> for PanelRenderElement {
 
     fn underlying_storage(&self, renderer: &mut GlesRenderer) -> Option<UnderlyingStorage> {
         match self {
-            PanelRenderElement::Wayland(e) => e.underlying_storage(renderer),
+            PanelRenderElement::Wayland(e, ..) => e.underlying_storage(renderer),
             PanelRenderElement::RoundedRectangle(e) => e.underlying_storage(renderer),
             PanelRenderElement::OverflowMenu(e) => e.underlying_storage(renderer),
         }
@@ -172,7 +176,30 @@ impl PanelSpace {
                                         smithay::backend::renderer::element::Kind::Unspecified,
                                     )
                                     .into_iter()
-                                    .map(|r| PanelRenderElement::Wayland(r))
+                                    .map(
+                                        |r: WaylandSurfaceRenderElement<GlesRenderer>| {
+                                            let mut src = r.src();
+                                            let mut geo = r.geometry(self.scale.into());
+                                            if let Some(size) = t.current_state().size {
+                                                let scaled_size = size
+                                                    .to_f64()
+                                                    .to_buffer(
+                                                        self.scale,
+                                                        smithay::utils::Transform::Normal,
+                                                    )
+                                                    .to_i32_ceil();
+                                                if size.w > 0 && scaled_size.w < src.size.w {
+                                                    src.size.w = scaled_size.w;
+                                                    geo.size.w = scaled_size.w.ceil() as i32;
+                                                }
+                                                if size.h > 0 && scaled_size.h < src.size.h {
+                                                    src.size.h = scaled_size.h;
+                                                    geo.size.h = scaled_size.h.ceil() as i32;
+                                                }
+                                            }
+                                            PanelRenderElement::Wayland(r, src, geo)
+                                        },
+                                    )
                                 })
                             })
                             .flatten(),

@@ -94,6 +94,8 @@ pub struct PanelClient {
     pub minimize_priority: Option<u32>,
     pub requests_wayland_display: Option<bool>,
     pub is_notification_applet: Option<bool>,
+    pub shrink_priority: Option<u32>,
+    pub shrink_min_size: Option<u32>,
     /// If there is an existing popup, this applet with be pressed when hovered.
     pub auto_popup_hover_press: Option<AppletAutoClickAnchor>,
 }
@@ -140,6 +142,8 @@ impl PanelClient {
             requests_wayland_display: None,
             is_notification_applet: None,
             auto_popup_hover_press: None,
+            shrink_priority: None,
+            shrink_min_size: None,
         }
     }
 }

@@ -852,7 +852,9 @@ source = "git+https://github.com/pop-os/libcosmic#f820eb7ffe8ad6e5931f481469eeb7
 dependencies = [
  "atomicwrites",
  "cosmic-config-derive",
+ "cosmic-settings-daemon",
  "dirs 5.0.1",
+ "futures-util",
  "iced_futures",
  "known-folders",
  "notify",
@@ -861,6 +863,7 @@ dependencies = [
  "serde",
  "tracing",
  "xdg",
+ "zbus 4.2.2",
 ]
 
 [[package]]
@@ -897,7 +900,7 @@ dependencies = [
  "csscolorparser",
  "freedesktop-desktop-entry",
  "iced_tiny_skia",
- "itertools 0.11.0",
+ "itertools",
  "launch-pad",
  "libc",
  "libcosmic",
@@ -951,6 +954,14 @@ dependencies = [
  "wayland-protocols 0.31.2",
  "wayland-scanner",
  "wayland-server",
+]
+
+[[package]]
+name = "cosmic-settings-daemon"
+version = "0.1.0"
+source = "git+https://github.com/pop-os/dbus-settings-bindings#1fdfcc8045e6732fc54b2c945008e89999a6cf71"
+dependencies = [
+ "zbus 4.2.2",
 ]
 
 [[package]]
@@ -2172,7 +2183,7 @@ dependencies = [
  "iced_graphics",
  "iced_runtime",
  "iced_style",
- "itertools 0.12.1",
+ "itertools",
  "lazy_static",
  "raw-window-handle",
  "smithay-client-toolkit 0.19.1",
@@ -2473,15 +2484,6 @@ checksum = "5a611371471e98973dbcab4e0ec66c31a10bc356eeb4d54a0e05eac8158fe38c"
 
 [[package]]
 name = "itertools"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
@@ -2617,6 +2619,7 @@ dependencies = [
  "apply",
  "chrono",
  "cosmic-config",
+ "cosmic-settings-daemon",
  "cosmic-theme",
  "css-color",
  "derive_setters",
@@ -2640,6 +2643,7 @@ dependencies = [
  "tracing",
  "unicode-segmentation",
  "url",
+ "zbus 4.2.2",
 ]
 
 [[package]]
@@ -5453,7 +5457,7 @@ source = "git+https://github.com/pop-os/xdg-shell-wrapper#b5480042615ecfcf30262d
 dependencies = [
  "anyhow",
  "cosmic-client-toolkit",
- "itertools 0.12.1",
+ "itertools",
  "libc",
  "once_cell",
  "rand",

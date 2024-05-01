@@ -1,4 +1,7 @@
-use std::slice::IterMut;
+use std::{
+    slice::{Iter, IterMut},
+    sync::MutexGuard,
+};
 
 use crate::{
     iced::elements::CosmicMappedInternal,
@@ -6,14 +9,15 @@ use crate::{
     space::{corner_element::RoundedRectangleSettings, Alignment},
 };
 
-use super::PanelSpace;
+use super::{panel_space::PanelClient, PanelSpace};
+use anyhow::bail;
 use cosmic_panel_config::PanelAnchor;
 use itertools::{chain, Itertools};
 use sctk::shell::WaylandSurface;
 use smithay::{
-    desktop::Window,
+    desktop::{Space, Window},
     reexports::wayland_server::Resource,
-    utils::{IsAlive, Physical, Rectangle, Size},
+    utils::{IsAlive, Logical, Physical, Rectangle, Size},
 };
 
 impl PanelSpace {
@@ -43,7 +47,6 @@ impl PanelSpace {
                 let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
 
                 let constrained = self.constrain_dim(size, Some(gap as u32));
-
                 let unmap = if self.config.is_horizontal() {
                     constrained.h < size.h
                 } else {
@@ -61,9 +64,9 @@ impl PanelSpace {
             })
             .collect_vec();
         for w in self.unmapped.drain(..).collect_vec() {
-            if w.alive() && {
-                let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
+            let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
 
+            if w.alive() && {
                 let constrained = self.constrain_dim(size, Some(gap as u32));
                 if self.config.is_horizontal() {
                     constrained.h >= size.h
@@ -98,6 +101,7 @@ impl PanelSpace {
                     let Some(t) = w.toplevel() else {
                         return None;
                     };
+
                     if Some(c.client.id()) == t.wl_surface().client().map(|c| c.id()) {
                         Some((i, w.clone(), c.minimize_priority))
                     } else {
@@ -191,9 +195,20 @@ impl PanelSpace {
             (i, w, _): &(usize, Window, Option<u32>),
             anchor: PanelAnchor,
             alignment: Alignment,
-            _scale: f64,
+            scale: f64,
         ) -> (Alignment, usize, i32, i32) {
-            let bbox = w.bbox().size;
+            let mut bbox = w.bbox().size;
+            let constrained_bbox = w
+                .toplevel()
+                .and_then(|t| t.current_state().size)
+                .map(|s| s.to_f64().upscale(scale).to_i32_ceil())
+                .unwrap_or_else(|| w.bbox().size);
+            if constrained_bbox.w > 0 {
+                bbox.w = constrained_bbox.w;
+            }
+            if constrained_bbox.h > 0 {
+                bbox.h = constrained_bbox.h;
+            }
 
             match anchor {
                 PanelAnchor::Left | PanelAnchor::Right => (alignment, *i, bbox.h, bbox.w),
@@ -256,11 +271,6 @@ impl PanelSpace {
             dim.w += gap as i32;
             dim
         };
-        // update input region of panel when list changes
-        let (input_region, layer) = match (self.input_region.as_ref(), self.layer.as_ref()) {
-            (Some(r), Some(layer)) => (r, layer),
-            _ => panic!("input region or layer missing"),
-        };
 
         let (new_list_dim_length, new_list_thickness_dim) = if self.config.is_horizontal() {
             (new_dim.w, new_dim.h)
@@ -288,6 +298,69 @@ impl PanelSpace {
         self.container_length = container_length;
         let container_lengthwise_pos = (new_list_dim_length - container_length) / 2;
 
+        let center_pos = layer_major as f64 / 2. - center_sum / 2.;
+        let left_pos = container_lengthwise_pos as f64 + padding_u32 as f64;
+
+        let right_pos = container_lengthwise_pos as f64 + container_length as f64
+            - padding_u32 as f64
+            - right_sum;
+        let one_third = (layer_major as f64 - (spacing_u32 * num_lists.saturating_sub(1)) as f64)
+            / (3.min(num_lists) as f64);
+        let one_half = layer_major as f64 / (2.min(num_lists) as f64);
+        let larger_side = left_sum.max(right_sum);
+
+        let target_center_len = (layer_major as f64 - spacing_u32 as f64 * 2. - larger_side * (2.))
+            .max(one_third)
+            .min(layer_major as f64);
+
+        let target_left_len = if windows_center.is_empty() {
+            (layer_major as f64 - right_sum.min(one_half) - spacing_u32 as f64).max(one_half)
+        } else {
+            (one_half - target_center_len.min(center_sum) / 2.).max(one_third)
+        }
+        .min(layer_major as f64);
+
+        let target_right_len = if windows_center.is_empty() {
+            (layer_major as f64 - left_sum.min(one_half) - spacing_u32 as f64).max(one_half)
+        } else {
+            (one_half - target_center_len.min(center_sum) / 2.).max(one_third)
+        }
+        .min(layer_major as f64);
+
+        let center_overflow = (center_sum - target_center_len) as i32;
+        if center_overflow <= 0 {
+            // check if it can be expanded
+            self.relax_overflow_center(center_overflow.abs() as u32)
+        } else if center_overflow > 0 {
+            dbg!(center_sum, target_center_len);
+
+            let overflow = self.shrink_center((center_sum - target_center_len) as u32);
+            bail!("overflow: {}", overflow)
+        }
+
+        let left_overflow = (left_sum - target_left_len) as i32;
+        if left_overflow <= 0 {
+            // check if it can be expanded
+            self.relax_overflow_left(left_overflow.abs() as u32);
+        } else if left_overflow > 0 {
+            let overflow = self.shrink_left(left_overflow as u32);
+            bail!("overflow: {}", overflow)
+        }
+
+        let right_overflow = (right_sum - target_right_len) as i32;
+        if right_overflow <= 0 {
+            // check if it can be expanded
+            self.relax_overflow_right(right_overflow.abs() as u32);
+        } else {
+            let overflow = self.shrink_right(right_overflow as u32);
+            bail!("overflow: {}", overflow)
+        }
+
+        // update input region of panel when list changes
+        let (input_region, layer) = match (self.input_region.as_ref(), self.layer.as_ref()) {
+            (Some(r), Some(layer)) => (r, layer),
+            _ => panic!("input region or layer missing"),
+        };
         if self.panel_changed {
             {
                 let gap = self.gap() as f64 * self.scale;
@@ -329,6 +402,7 @@ impl PanelSpace {
                     border_color: [0.0, 0.0, 0.0, 0.0],
                 };
             }
+
             input_region.subtract(
                 0,
                 0,
@@ -362,20 +436,7 @@ impl PanelSpace {
         fn center_in_bar(crosswise_dim: u32, dim: u32) -> i32 {
             (crosswise_dim as i32 - dim as i32) / 2
         }
-        // eq length should assign space evenly to all lists even if they are empty
-        let requested_eq_length: f64 = container_length as f64 / 3.;
-        let center_left_spacing = if left_sum < requested_eq_length as f64
-            && center_sum < requested_eq_length as f64
-            && right_sum < requested_eq_length as f64
-        {
-            let center_spacing = (requested_eq_length as f64 - center_sum) / 2.0;
-            let left_spacing = requested_eq_length as f64 - left_sum - padding_u32 as f64;
-            left_spacing + center_spacing
-        } else {
-            (container_length as f64 - left_sum - center_sum - right_sum - 2. * padding_u32 as f64)
-                as f64
-                / 2.
-        };
+
         if new_list_thickness_dim != list_cross {
             self.pending_dimensions = Some(new_dim);
             self.is_dirty = true;
@@ -392,7 +453,22 @@ impl PanelSpace {
             for (_, w, minimize_priority) in windows {
                 // XXX this is a hack to get the logical size of the window
                 // TODO improve how this is done
-                let size = w.bbox().size.to_f64().downscale(self.scale);
+                let bbox = w.bbox().size.to_f64().downscale(self.scale);
+                let size = w
+                    .toplevel()
+                    .and_then(|t| t.current_state().size)
+                    .map(|s| {
+                        let mut ret = s.to_f64();
+                        if s.w == 0 {
+                            ret.w = bbox.w;
+                        }
+                        if s.h == 0 {
+                            ret.h = bbox.h;
+                        }
+
+                        ret
+                    })
+                    .unwrap_or_else(|| bbox);
 
                 let cur: f64 = prev;
                 let (x, y);
@@ -453,23 +529,272 @@ impl PanelSpace {
             }
             prev
         };
-        let mut prev: f64 = container_lengthwise_pos as f64 + padding_u32 as f64;
-        prev = map_windows(windows_left.iter_mut(), prev);
+        map_windows(windows_left.iter_mut(), left_pos as f64);
         // will be already offset if dock
-        prev += center_left_spacing;
-        map_windows(windows_center.iter_mut(), prev);
-        let prev = container_lengthwise_pos as f64 + container_length as f64
-            - padding_u32 as f64
-            - right_sum;
+        map_windows(windows_center.iter_mut(), center_pos as f64);
 
-        map_windows(windows_right.iter_mut(), prev);
+        map_windows(windows_right.iter_mut(), right_pos as f64);
         self.space.refresh();
 
         Ok(())
     }
 
-    fn overflow(&mut self) {
-        // TODO
+    fn shrinkable_clients<'a>(
+        &self,
+        clients: impl Iterator<Item = &'a PanelClient>,
+    ) -> OverflowClientPartition {
+        let mut overflow_partition = OverflowClientPartition::default();
+        for c in clients {
+            let Some(w) = self.space.elements().find_map(|e| {
+                let CosmicMappedInternal::Window(w) = e else {
+                    return None;
+                };
+                if w.alive()
+                    && w.toplevel().is_some_and(|t| {
+                        t.wl_surface().client().is_some_and(|w_client| w_client == c.client)
+                    })
+                {
+                    Some((w.clone(), c.minimize_priority.unwrap_or_default()))
+                } else {
+                    return None;
+                }
+            }) else {
+                tracing::warn!("Client not found in space {:?}", c.name);
+                continue;
+            };
+            if c.shrink_min_size.is_some_and(|s| s > 0) {
+                overflow_partition.shrinkable.push((w.0, w.1, c.shrink_min_size.unwrap()));
+            } else {
+                overflow_partition.movable.push(w);
+            }
+        }
+        // sort by priority
+        overflow_partition.shrinkable.sort_by(|(_, a, _), (_, b, _)| b.cmp(a));
+        overflow_partition.movable.sort_by(|(_, a), (_, b)| b.cmp(a));
+        overflow_partition
+    }
+
+    fn shrink_left(&mut self, overflow: u32) -> u32 {
+        let left = self.clients_left.lock().unwrap();
+        let mut clients = self.shrinkable_clients(left.iter());
+        drop(left);
+        self.shrink_clients(overflow, &mut clients, OverflowSection::Left)
+    }
+
+    fn shrink_center(&mut self, overflow: u32) -> u32 {
+        let g = self.clients_center.lock().unwrap();
+        let left_g = self.clients_left.lock().unwrap();
+        let right_g = self.clients_right.lock().unwrap();
+        let center: Vec<&PanelClient> = if self.config.expand_to_edges {
+            g.iter().collect()
+        } else {
+            left_g.iter().chain(g.iter()).chain(right_g.iter()).collect()
+        };
+        let mut clients = self.shrinkable_clients(center.into_iter());
+        drop(g);
+        drop(left_g);
+        drop(right_g);
+        self.shrink_clients(overflow, &mut clients, OverflowSection::Center)
+    }
+
+    fn shrink_right(&mut self, overflow: u32) -> u32 {
+        let right = self.clients_right.lock().unwrap();
+        let mut clients = self.shrinkable_clients(right.iter());
+        drop(right);
+        self.shrink_clients(overflow, &mut clients, OverflowSection::Right)
+    }
+
+    fn shrink_clients(
+        &mut self,
+        mut overflow: u32,
+        clients: &mut OverflowClientPartition,
+        section: OverflowSection,
+    ) -> u32 {
+        let mut i = 0;
+        let shrinkable = &mut clients.shrinkable;
+        let unit_size = self.config.size.get_applet_icon_size_with_padding(true);
+        dbg!(overflow, shrinkable.len());
+        while overflow > 0 && i < shrinkable.len() {
+            dbg!(overflow);
+            let (w, _, min_units) = &mut shrinkable[i];
+            let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
+            let major_dim = if self.config.is_horizontal() { size.w } else { size.h };
+            let unit_size = (major_dim as f32 / unit_size as f32).ceil() as u32;
+            let new_dim = (major_dim as u32).saturating_sub(overflow).max(*min_units * unit_size);
+            let diff = (major_dim as u32).saturating_sub(new_dim);
+            dbg!(new_dim);
+            if diff == 0 {
+                i += 1;
+                continue;
+            }
+
+            if let Some(t) = w.toplevel() {
+                t.with_pending_state(|s| {
+                    if self.config.is_horizontal() {
+                        s.size = Some((new_dim as i32, size.h).into());
+                    } else {
+                        s.size = Some((size.w, new_dim as i32).into());
+                    }
+                });
+                t.send_pending_configure();
+                overflow = overflow.saturating_sub(diff);
+            }
+            i += 1;
+        }
+        if overflow > 0 {
+            return self.move_to_overflow(
+                overflow,
+                self.config.is_horizontal(),
+                clients.clone(),
+                section,
+            );
+        }
+        dbg!("finished", overflow);
+        overflow
+    }
+
+    fn move_to_overflow(
+        &mut self,
+        mut overflow: u32,
+        is_horizontal: bool,
+        clients: OverflowClientPartition,
+        section: OverflowSection,
+    ) -> u32 {
+        let overflow_space = match section {
+            OverflowSection::Left => &mut self.overflow_left,
+            OverflowSection::Center => &mut self.overflow_center,
+            OverflowSection::Right => &mut self.overflow_right,
+        };
+        let mut overflow_cnt = overflow_space.elements().count();
+        let applet_size_unit = self.config.size.get_applet_icon_size(true)
+            + 2 * self.config.size.get_applet_padding(true) as u32;
+        if overflow_cnt == 0 {
+            overflow += applet_size_unit;
+        }
+        let space = &mut self.space;
+        // TODO move applets until overflow is <= 0
+        for w in clients.movable {
+            if overflow == 0 {
+                break;
+            }
+            overflow_cnt += 1;
+            let diff =
+                if is_horizontal { w.0.bbox().size.w as u32 } else { w.0.bbox().size.h as u32 };
+            overflow = overflow.saturating_sub(diff);
+            let x = (overflow_cnt % 8) as i32 * applet_size_unit as i32;
+            let y = (overflow_cnt / 8) as i32 * applet_size_unit as i32;
+
+            space.unmap_elem(&CosmicMappedInternal::Window(w.0.clone()));
+            // Rows of 8 with configured applet size
+            if let Some(t) = w.0.toplevel() {
+                t.with_pending_state(|s| {
+                    s.size = Some((applet_size_unit as i32, applet_size_unit as i32).into());
+                });
+                t.send_pending_configure();
+            }
+            overflow_space.map_element(w.0, (x, y), false);
+        }
+
+        overflow
+    }
+
+    fn move_from_overflow(
+        mut extra_space: u32,
+        is_horizontal: bool,
+        space: &mut Space<CosmicMappedInternal>,
+        overflow_space: &mut Space<Window>,
+        suggested_size: u32,
+    ) -> u32 {
+        // TODO move applets until extra_space is as close as possible to 0
+        let mut overflow_cnt = overflow_space.elements().count();
+        while overflow_cnt > 0 && extra_space > suggested_size {
+            overflow_cnt -= 1;
+
+            let w = overflow_space.elements().next().unwrap().clone();
+            let diff = if is_horizontal { w.bbox().size.w as u32 } else { w.bbox().size.h as u32 };
+            if extra_space >= diff {
+                extra_space = extra_space.saturating_sub(diff);
+                overflow_space.unmap_elem(&w);
+                space.map_element(CosmicMappedInternal::Window(w), (0, 0), false);
+            }
+        }
+        extra_space
+    }
+
+    fn relax_overflow_left(&mut self, extra_space: u32) {
+        let left = self.clients_left.lock().unwrap();
+        let mut clients = self.shrinkable_clients(left.iter());
+        drop(left);
+        if clients.shrinkable_is_relaxed(self.config.is_horizontal()) {
+            self.relax_overflow_clients(&mut clients);
+        } else {
+            let suggested_size = self.config.size.get_applet_icon_size(true) as u32
+                + self.config.size.get_applet_padding(true) as u32 * 2;
+            Self::move_from_overflow(
+                extra_space,
+                self.config.is_horizontal(),
+                &mut self.space,
+                &mut self.overflow_left,
+                suggested_size,
+            );
+        }
+    }
+
+    fn relax_overflow_center(&mut self, extra_space: u32) {
+        let center: MutexGuard<Vec<PanelClient>> = self.clients_center.lock().unwrap();
+        let mut clients = self.shrinkable_clients(center.iter());
+        drop(center);
+        if clients.shrinkable_is_relaxed(self.config.is_horizontal()) {
+            self.relax_overflow_clients(&mut clients);
+        } else {
+            let suggested_size = self.config.size.get_applet_icon_size(true) as u32
+                + self.config.size.get_applet_padding(true) as u32 * 2;
+            Self::move_from_overflow(
+                extra_space,
+                self.config.is_horizontal(),
+                &mut self.space,
+                &mut self.overflow_left,
+                suggested_size,
+            );
+        }
+    }
+
+    fn relax_overflow_right(&mut self, extra_space: u32) {
+        let right = self.clients_right.lock().unwrap();
+        let mut clients = self.shrinkable_clients(right.iter());
+        drop(right);
+        if clients.shrinkable_is_relaxed(self.config.is_horizontal()) {
+            self.relax_overflow_clients(&mut clients);
+        } else {
+            let suggested_size = self.config.size.get_applet_icon_size(true) as u32
+                + self.config.size.get_applet_padding(true) as u32 * 2;
+            Self::move_from_overflow(
+                extra_space,
+                self.config.is_horizontal(),
+                &mut self.space,
+                &mut self.overflow_left,
+                suggested_size,
+            );
+        }
+    }
+
+    fn relax_overflow_clients(&self, clients: &mut OverflowClientPartition) {
+        for (w, ..) in clients.shrinkable.drain(..) {
+            let Some(t) = w.toplevel() else {
+                continue;
+            };
+            let suggested_size = self.config.size.get_applet_icon_size(true) as i32
+                + self.config.size.get_applet_padding(true) as i32 * 2;
+            let is_horizontal = self.config.is_horizontal();
+            t.with_pending_state(|state| {
+                state.size = Some(if is_horizontal {
+                    (0, suggested_size).into()
+                } else {
+                    (suggested_size, 0).into()
+                });
+            });
+            t.send_pending_configure();
+        }
     }
 }
 
@@ -498,3 +823,38 @@ impl PanelSpace {
 // panels will now have up to 4 spaces.
 // they can have nested popups in a common use case now too.
 // overflow buttons go in the original space.
+
+#[derive(Debug, Clone, Copy)]
+pub enum OverflowSection {
+    Left,
+    Center,
+    Right,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct OverflowClientPartition {
+    /// windows for clients that can be shrunk, but not moved to the overflow
+    /// popup
+    pub(crate) shrinkable: Vec<(Window, u32, u32)>,
+    /// windows for clients that can be moved to the overflow popup, but not
+    /// shrunk
+    pub(crate) movable: Vec<(Window, u32)>,
+}
+
+impl OverflowClientPartition {
+    fn shrinkable_is_relaxed(&self, is_horizontal: bool) -> bool {
+        self.shrinkable.is_empty() || {
+            self.shrinkable.iter().all(|(w, ..)| {
+                w.toplevel().is_some_and(|t| {
+                    t.with_pending_state(|s| {
+                        if is_horizontal {
+                            s.size.map(|s| s.w as u32).unwrap_or_default().saturating_sub(1) == 0
+                        } else {
+                            s.size.map(|s| s.h as u32).unwrap_or_default().saturating_sub(1) == 0
+                        }
+                    })
+                })
+            })
+        }
+    }
+}
