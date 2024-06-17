@@ -563,10 +563,13 @@ impl WrapperSpace for PanelSpace {
                                     return;
                                 };
                                 if let Err(err) = pman
-                                    .update_process_env(&key, vec![(
-                                        "COSMIC_NOTIFICATIONS".to_string(),
-                                        fd.as_raw_fd().to_string(),
-                                    )])
+                                    .update_process_env(
+                                        &key,
+                                        vec![(
+                                            "COSMIC_NOTIFICATIONS".to_string(),
+                                            fd.as_raw_fd().to_string(),
+                                        )],
+                                    )
                                     .await
                                 {
                                     error!("Failed to update process env: {}", err);
@@ -648,7 +651,7 @@ impl WrapperSpace for PanelSpace {
             .space
             .elements()
             .filter_map(|w| if let CosmicMappedInternal::Window(w) = w { Some(w) } else { None })
-            .find(|w| w.wl_surface().as_ref() == Some(s))
+            .find(|w| w.wl_surface().is_some_and(|w| w.as_ref() == s))
         {
             w.on_commit();
             w.refresh();
@@ -781,7 +784,7 @@ impl WrapperSpace for PanelSpace {
             }
             if let Some((_, prev_foc)) = prev_hover.as_mut() {
                 prev_foc.c_pos = p.rectangle.loc;
-                prev_foc.s_pos = p.rectangle.loc - geo.loc;
+                prev_foc.s_pos = (p.rectangle.loc - geo.loc).to_f64();
 
                 prev_foc.surface = p.s_surface.wl_surface().clone();
                 Some(prev_foc.clone())
@@ -790,7 +793,7 @@ impl WrapperSpace for PanelSpace {
                     surface: p.s_surface.wl_surface().clone(),
                     seat_name: seat_name.to_string(),
                     c_pos: p.rectangle.loc,
-                    s_pos: p.rectangle.loc - geo.loc,
+                    s_pos: (p.rectangle.loc - geo.loc).to_f64(),
                 });
                 self.s_hovered_surface.last().cloned()
             }
@@ -800,8 +803,7 @@ impl WrapperSpace for PanelSpace {
                 if self.space.elements().any(|e| {
                     e.wl_surface()
                         .zip(prev_hover.as_ref())
-                        .map(|(s, prev_hover)| s == prev_hover.1.surface)
-                        .unwrap_or_default()
+                        .is_some_and(|(s, prev_hover)| s.as_ref() == &prev_hover.1.surface)
                 }) {
                     let (pos, _) = prev_hover.unwrap();
                     self.s_hovered_surface.remove(pos);
@@ -949,16 +951,16 @@ impl WrapperSpace for PanelSpace {
                     }
                 }
                 if let Some((_, prev_foc)) = prev_hover.as_mut() {
-                    prev_foc.s_pos = relative_loc;
+                    prev_foc.s_pos = relative_loc.to_f64();
                     prev_foc.c_pos = geo.loc;
-                    prev_foc.surface = w.wl_surface().unwrap();
+                    prev_foc.surface = w.wl_surface().map(|w| w.into_owned()).unwrap();
                     Some(prev_foc.clone())
                 } else {
                     self.s_hovered_surface.push(ServerPointerFocus {
-                        surface: w.wl_surface().unwrap(),
+                        surface: w.wl_surface().map(|w| w.into_owned()).unwrap(),
                         seat_name: seat_name.to_string(),
                         c_pos: geo.loc,
-                        s_pos: relative_loc,
+                        s_pos: relative_loc.to_f64(),
                     });
                     self.s_hovered_surface.last().cloned()
                 }

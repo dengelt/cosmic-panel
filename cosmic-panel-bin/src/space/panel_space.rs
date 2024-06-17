@@ -52,10 +52,13 @@ use smithay::{
 use tokio::sync::{mpsc, oneshot};
 use tracing::{error, info};
 use wayland_egl::WlEglSurface;
-use wayland_protocols::wp::{
-    fractional_scale::v1::client::wp_fractional_scale_v1::WpFractionalScaleV1,
-    security_context::v1::client::wp_security_context_v1::WpSecurityContextV1,
-    viewporter::client::wp_viewport::WpViewport,
+use wayland_protocols::{
+    wp::{
+        fractional_scale::v1::client::wp_fractional_scale_v1::WpFractionalScaleV1,
+        security_context::v1::client::wp_security_context_v1::WpSecurityContextV1,
+        viewporter::client::wp_viewport::WpViewport,
+    },
+    xdg::shell::client::xdg_positioner::ConstraintAdjustment,
 };
 use xdg_shell_wrapper::{
     client_state::{ClientFocus, FocusStatus},
@@ -1065,11 +1068,11 @@ impl PanelSpace {
             parent_size,
             parent_configure: _,
         } = pos_state;
-        let p_offset = if let Some(s) = self
-            .space
-            .elements()
-            .find(|w| s_surface.get_parent_surface().is_some_and(|s| w.wl_surface() == Some(s)))
-        {
+        let p_offset = if let Some(s) = self.space.elements().find(|w| {
+            s_surface
+                .get_parent_surface()
+                .is_some_and(|s| w.wl_surface().is_some_and(|w| w.as_ref() == &s))
+        }) {
             self.space.element_location(s).unwrap_or_else(|| (0, 0).into())
         } else if let Some(p) = self.popups.iter().find(|p| {
             s_surface.get_parent_surface().is_some_and(|s| &s == p.s_surface.wl_surface())
@@ -1090,7 +1093,9 @@ impl PanelSpace {
         positioner.set_anchor(Anchor::try_from(anchor_edges as u32).unwrap_or(Anchor::None));
         positioner.set_gravity(Gravity::try_from(gravity as u32).unwrap_or(Gravity::None));
 
-        positioner.set_constraint_adjustment(u32::from(constraint_adjustment));
+        positioner.set_constraint_adjustment(
+            u32::from(constraint_adjustment).try_into().unwrap_or(ConstraintAdjustment::empty()),
+        );
         positioner.set_offset(offset.x, offset.y);
         if positioner.version() >= 3 {
             if reactive {

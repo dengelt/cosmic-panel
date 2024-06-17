@@ -1,6 +1,8 @@
 pub mod overflow_button;
 pub mod overflow_popup;
 
+use std::borrow::Cow;
+
 use overflow_button::OverflowButton;
 use smithay::{
     desktop::Window,
@@ -27,7 +29,7 @@ impl CosmicMappedInternal {
 impl WaylandFocus for CosmicMappedInternal {
     fn wl_surface(
         &self,
-    ) -> Option<smithay::reexports::wayland_server::protocol::wl_surface::WlSurface> {
+    ) -> Option<Cow<'_, smithay::reexports::wayland_server::protocol::wl_surface::WlSurface>> {
         match self {
             CosmicMappedInternal::Window(w) => w.wl_surface(),
             _ => None,

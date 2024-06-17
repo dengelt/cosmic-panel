@@ -1,4 +1,4 @@
-use std::{num::NonZeroU32, time::Duration};
+use std::time::Duration;
 
 use crate::iced::elements::CosmicMappedInternal;
 
@@ -74,11 +74,12 @@ impl RenderElement<GlesRenderer> for PanelRenderElement {
         src: Rectangle<f64, Buffer>,
         dst: Rectangle<i32, Physical>,
         damage: &[Rectangle<i32, Physical>],
+        opaque_regions: &[Rectangle<i32, Physical>],
     ) -> Result<(), GlesError> {
         match self {
-            Self::Wayland(e, ..) => e.draw(frame, src, dst, damage),
-            Self::RoundedRectangle(e) => e.draw(frame, src, dst, damage),
-            Self::OverflowMenu(e) => e.draw(frame, src, dst, damage),
+            Self::Wayland(e, ..) => e.draw(frame, src, dst, damage, opaque_regions),
+            Self::RoundedRectangle(e) => e.draw(frame, src, dst, damage, opaque_regions),
+            Self::OverflowMenu(e) => e.draw(frame, src, dst, damage, opaque_regions),
         }
     }
 

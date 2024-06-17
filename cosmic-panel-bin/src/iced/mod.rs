@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     fmt,
     hash::{Hash, Hasher},
@@ -719,7 +720,7 @@ impl<P, R> AsRenderElements<R> for IcedElement<P>
 where
     P: Program + Send + 'static,
     R: Renderer + ImportMem,
-    <R as Renderer>::TextureId: 'static,
+    <R as Renderer>::TextureId: 'static + Clone,
 {
     type RenderElement = MemoryRenderBufferRenderElement<R>;
 
@@ -833,7 +834,7 @@ where
 impl<P: Program + Send> WaylandFocus for IcedElement<P> {
     fn wl_surface(
         &self,
-    ) -> Option<smithay::reexports::wayland_server::protocol::wl_surface::WlSurface> {
+    ) -> Option<Cow<'_, smithay::reexports::wayland_server::protocol::wl_surface::WlSurface>> {
         None
     }
 
