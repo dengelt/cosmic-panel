@@ -8,6 +8,7 @@ use std::{
 };
 
 use cctk::wayland_client::Connection;
+use cosmic::theme;
 use launch_pad::process::Process;
 use sctk::{
     compositor::Region,
@@ -73,7 +74,9 @@ use xdg_shell_wrapper::{
 
 use cosmic_panel_config::{CosmicPanelBackground, CosmicPanelConfig, PanelAnchor};
 
-use crate::{iced::elements::CosmicMappedInternal, PanelCalloopMsg};
+use crate::{
+    iced::elements::CosmicMappedInternal, space_container::SpaceContainer, PanelCalloopMsg,
+};
 
 use super::corner_element::{init_shaders, RoundedRectangleSettings};
 
@@ -169,6 +172,30 @@ pub struct AnimateState {
     duration: Duration,
 }
 
+#[derive(Debug, Clone)]
+pub struct PanelColors {
+    pub theme: cosmic::Theme,
+    pub color_override: Option<[f32; 4]>,
+}
+
+impl PanelColors {
+    pub fn new(theme: cosmic::Theme) -> Self {
+        Self { theme, color_override: None }
+    }
+
+    pub fn with_color_override(mut self, color_override: Option<[f32; 4]>) -> Self {
+        self.color_override = color_override;
+        self
+    }
+
+    pub fn bg_color(&self, alpha: f32) -> [f32; 4] {
+        self.color_override.unwrap_or_else(|| {
+            let c = self.theme.cosmic().bg_color();
+            [c.red, c.green, c.blue, alpha]
+        })
+    }
+}
+
 /// space for the cosmic panel
 #[derive(Debug)]
 pub(crate) struct PanelSpace {
@@ -211,7 +238,7 @@ pub(crate) struct PanelSpace {
     pub(crate) layer_viewport: Option<WpViewport>,
     pub(crate) popups: Vec<WrapperPopup>,
     pub(crate) start_instant: Instant,
-    pub bg_color: [f32; 4],
+    pub colors: PanelColors,
     pub(crate) applet_tx: mpsc::Sender<AppletMsg>,
     pub(crate) input_region: Option<Region>,
     pub(crate) panel_changed: bool,
@@ -229,6 +256,7 @@ pub(crate) struct PanelSpace {
     pub(crate) generated_ptr_event_count: usize,
     pub scale_change_retries: u32,
     pub additional_gap: i32,
+    pub loop_handle: calloop::LoopHandle<'static, GlobalState<SpaceContainer>>,
 }
 
 impl PanelSpace {
@@ -238,15 +266,14 @@ impl PanelSpace {
         c_focused_surface: Rc<RefCell<ClientFocus>>,
         c_hovered_surface: Rc<RefCell<ClientFocus>>,
         applet_tx: mpsc::Sender<AppletMsg>,
-        mut bg_color: [f32; 4],
+        theme: cosmic::Theme,
         s_display: DisplayHandle,
         security_context_manager: Option<SecurityContextManager>,
         conn: &Connection,
         panel_tx: calloop::channel::SyncSender<PanelCalloopMsg>,
         visibility: Visibility,
+        loop_handle: calloop::LoopHandle<'static, GlobalState<SpaceContainer>>,
     ) -> Self {
-        bg_color[3] = config.opacity;
-
         Self {
             config,
             space: Space::default(),
@@ -276,7 +303,7 @@ impl PanelSpace {
             c_hovered_surface,
             s_focused_surface: Default::default(),
             s_hovered_surface: Default::default(),
-            bg_color,
+            colors: PanelColors::new(theme),
             applet_tx,
             actual_size: (0, 0).into(),
             input_region: None,
@@ -297,6 +324,7 @@ impl PanelSpace {
             generated_ptr_event_count: 0,
             scale_change_retries: 0,
             additional_gap: 0,
+            loop_handle,
         }
     }
 
@@ -312,7 +340,7 @@ impl PanelSpace {
         if let Some(animatable_state) = self.animate_state.as_ref() {
             animatable_state.cur.bg_color
         } else {
-            self.bg_color
+            self.colors.bg_color(self.config.opacity)
         }
     }
 
@@ -641,7 +669,12 @@ impl PanelSpace {
             self.is_dirty = true;
             if progress >= 1.0 {
                 tracing::info!("Animation finished, setting bg_color to end value");
-                self.bg_color = animation_state.end.bg_color;
+                if let CosmicPanelBackground::Color(c) = self.config.background {
+                    self.colors = PanelColors::new(self.colors.theme.clone())
+                        .with_color_override(Some([c[0], c[1], c[2], self.config.opacity]));
+                } else {
+                    self.colors.color_override = None;
+                }
                 self.animate_state = None;
                 return;
             }
@@ -1012,15 +1045,13 @@ impl PanelSpace {
         }
     }
 
-    pub fn set_theme_window_color(&mut self, mut color: [f32; 4]) {
-        if let CosmicPanelBackground::ThemeDefault = self.config.background {
-            color[3] = self.config.opacity;
-        }
+    pub fn set_theme(&mut self, colors: PanelColors) {
+        let color = colors.bg_color(self.config.opacity);
         if let Some(animate_state) = self.animate_state.as_mut() {
             animate_state.end.bg_color = color;
         } else {
             let start = AnimatableState {
-                bg_color: self.bg_color,
+                bg_color: self.colors.bg_color(self.config.opacity),
                 border_radius: self.config.border_radius,
                 expanded: if self.config.expand_to_edges { 1.0 } else { 0.0 },
                 gap: self.gap(),
@@ -1037,7 +1068,7 @@ impl PanelSpace {
                 duration: Duration::from_millis(300),
             })
         }
-        self.bg_color = color;
+        self.colors = colors;
     }
 
     /// clear the panel
@@ -1107,7 +1138,13 @@ impl PanelSpace {
         }
     }
 
-    pub fn update_config(&mut self, config: CosmicPanelConfig, bg_color: [f32; 4], animate: bool) {
+    pub fn update_config(
+        &mut self,
+        config: CosmicPanelConfig,
+        bg_color: Option<[f32; 4]>,
+        animate: bool,
+    ) {
+        let bg_color = bg_color.unwrap_or_else(|| self.colors.bg_color(config.opacity));
         // avoid animating if currently maximized
         if self.maximized {
             return;
@@ -1201,7 +1238,7 @@ impl PanelSpace {
 
         if animate {
             let start = AnimatableState {
-                bg_color: self.bg_color,
+                bg_color: self.colors.bg_color(self.config.opacity),
                 border_radius: self.config.border_radius,
                 expanded: if self.config.expand_to_edges { 1.0 } else { 0.0 },
                 gap: self.gap(),
@@ -1234,21 +1271,17 @@ impl PanelSpace {
         self.clear();
     }
 
-    pub fn set_maximized(
-        &mut self,
-        maximized: bool,
-        config: CosmicPanelConfig,
-        bg_color: [f32; 4],
-    ) {
+    pub fn set_maximized(&mut self, maximized: bool, config: CosmicPanelConfig, opacity: f32) {
         if self.maximized == maximized {
             return;
         }
+        let bg_color = self.colors.bg_color(opacity);
         if !self.maximized {
-            self.update_config(config, bg_color, self.config.autohide.is_none());
+            self.update_config(config, Some(bg_color), self.config.autohide.is_none());
             self.maximized = maximized;
         } else {
             self.maximized = maximized;
-            self.update_config(config, bg_color, self.config.autohide.is_none());
+            self.update_config(config, Some(bg_color), self.config.autohide.is_none());
             if let Some(s) = self.animate_state.as_mut() {
                 s.end.bg_color[3] = self.config.opacity;
             }

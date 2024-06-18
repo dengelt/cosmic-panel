@@ -3,7 +3,7 @@ pub mod overflow_popup;
 
 use std::borrow::Cow;
 
-use overflow_button::OverflowButton;
+use overflow_button::{OverflowButton, OverflowButtonElement};
 use smithay::{
     desktop::Window,
     space_elements,
@@ -13,7 +13,7 @@ use smithay::{
 space_elements! {
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     pub CosmicMappedInternal;
-    OverflowButton=OverflowButton,
+    OverflowButton=OverflowButtonElement,
     Window=Window
 }
 

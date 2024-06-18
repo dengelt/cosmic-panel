@@ -129,24 +129,17 @@ impl SpaceContainer {
             let c = self.config.config_list.iter().find(|c| c.name == s.config.name);
             let mut config = s.config.clone();
 
-            let mut bg_color = if s.is_dark(self.is_dark) { self.dark_bg } else { self.light_bg };
-
-            if maximized {
-                bg_color[3] = 1.0;
+            let opacity = if maximized {
                 config.maximize();
+                1.0
             } else {
                 if let Some(c) = c {
                     config = c.clone();
                 }
-                bg_color = match config.background {
-                    CosmicPanelBackground::ThemeDefault => bg_color,
-                    CosmicPanelBackground::Dark => self.dark_bg,
-                    CosmicPanelBackground::Light => self.light_bg,
-                    CosmicPanelBackground::Color(c) => [c[0], c[1], c[2], config.opacity],
-                };
-            }
+                config.opacity
+            };
 
-            s.set_maximized(maximized, config, bg_color)
+            s.set_maximized(maximized, config, opacity)
         }
     }
 

@@ -4,7 +4,7 @@ use cosmic_panel_config::{CosmicPanelBackground, CosmicPanelContainerConfig, Cos
 use itertools::Itertools;
 use sctk::{
     compositor::CompositorState,
-    output::{self, OutputInfo},
+    output::OutputInfo,
     reexports::client::{
         protocol::{wl_output::WlOutput, wl_surface as c_wl_surface},
         Connection, QueueHandle,
@@ -80,10 +80,10 @@ impl WrapperSpace for SpaceContainer {
                             self.c_hovered_surface.clone(),
                             self.applet_tx.clone(),
                             match config.background {
-                                CosmicPanelBackground::ThemeDefault => self.cur_bg_color(),
-                                CosmicPanelBackground::Dark => self.dark_bg,
-                                CosmicPanelBackground::Light => self.light_bg,
-                                CosmicPanelBackground::Color(c) => [c[0], c[1], c[1], 1.0],
+                                CosmicPanelBackground::ThemeDefault
+                                | CosmicPanelBackground::Color(_) => self.cur_theme(),
+                                CosmicPanelBackground::Dark => self.dark_theme.clone(),
+                                CosmicPanelBackground::Light => self.light_theme.clone(),
                             },
                             self.s_display.clone().unwrap(),
                             self.security_context_manager.clone(),
@@ -94,6 +94,7 @@ impl WrapperSpace for SpaceContainer {
                             } else {
                                 Visibility::Visible
                             },
+                            self.loop_handle.clone(),
                         );
                         s.setup(
                             compositor_state,
@@ -160,9 +161,9 @@ impl WrapperSpace for SpaceContainer {
         };
         self.outputs.push((c_output.clone(), s_output.clone(), output_info.clone()));
 
-        let cur = self.cur_bg_color();
-        let dark = self.dark_bg;
-        let light = self.light_bg;
+        let cur = self.cur_theme();
+        let dark = self.dark_theme.clone();
+        let light = self.light_theme.clone();
         // TODO error handling
         // create the spaces that are configured to use this output, including spaces
         // configured for All
@@ -179,10 +180,10 @@ impl WrapperSpace for SpaceContainer {
                 match &config.output {
                     CosmicPanelOuput::All => {
                         let c = match config.background {
-                            CosmicPanelBackground::ThemeDefault => cur,
-                            CosmicPanelBackground::Dark => dark,
-                            CosmicPanelBackground::Light => light,
-                            CosmicPanelBackground::Color(c) => [c[0], c[1], c[1], 1.0],
+                            CosmicPanelBackground::ThemeDefault
+                            | CosmicPanelBackground::Color(_) => cur.clone(),
+                            CosmicPanelBackground::Dark => dark.clone(),
+                            CosmicPanelBackground::Light => light.clone(),
                         };
                         let mut s = if let Some(s) = self.space_list.iter_mut().position(|s| {
                             s.config.name == config.name
@@ -201,6 +202,7 @@ impl WrapperSpace for SpaceContainer {
                                 conn,
                                 self.panel_tx.clone(),
                                 visible,
+                                self.loop_handle.clone(),
                             );
                             s.setup(
                                 compositor_state,
@@ -247,16 +249,17 @@ impl WrapperSpace for SpaceContainer {
                                 self.c_hovered_surface.clone(),
                                 self.applet_tx.clone(),
                                 match config.background {
-                                    CosmicPanelBackground::ThemeDefault => cur,
-                                    CosmicPanelBackground::Dark => dark,
-                                    CosmicPanelBackground::Light => light,
-                                    CosmicPanelBackground::Color(c) => [c[0], c[1], c[1], 1.0],
+                                    CosmicPanelBackground::ThemeDefault
+                                    | CosmicPanelBackground::Color(_) => cur.clone(),
+                                    CosmicPanelBackground::Dark => dark.clone(),
+                                    CosmicPanelBackground::Light => light.clone(),
                                 },
                                 self.s_display.clone().unwrap(),
                                 self.security_context_manager.clone(),
                                 conn,
                                 self.panel_tx.clone(),
                                 visible,
+                                self.loop_handle.clone(),
                             );
 
                             if let Some(s_display) = self.s_display.as_ref() {

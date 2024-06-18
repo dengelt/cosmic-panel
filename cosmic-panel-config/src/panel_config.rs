@@ -509,6 +509,13 @@ impl CosmicPanelConfig {
         }
     }
 
+    pub fn bg_color_override(&self) -> Option<[f32; 4]> {
+        match self.background {
+            CosmicPanelBackground::Color(c) => Some([c[0], c[1], c[2], self.opacity]),
+            _ => None,
+        }
+    }
+
     /// get constraints for the thickness of the panel bar
     pub fn get_dimensions(
         &self,

@@ -9,7 +9,7 @@ mod popup;
 mod render;
 mod wrapper_space;
 
-pub(crate) use panel_space::{AppletMsg, PanelSpace};
+pub(crate) use panel_space::{AppletMsg, PanelColors, PanelSpace};
 
 #[derive(Debug)]
 pub enum Alignment {

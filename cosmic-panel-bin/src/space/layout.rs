@@ -1,10 +1,13 @@
 use std::{
     slice::{Iter, IterMut},
-    sync::MutexGuard,
+    sync::{atomic::AtomicBool, Arc, MutexGuard},
 };
 
 use crate::{
-    iced::elements::CosmicMappedInternal,
+    iced::elements::{
+        overflow_button::{OverflowButton, OverflowButtonElement},
+        CosmicMappedInternal,
+    },
     minimize::MinimizeApplet,
     space::{corner_element::RoundedRectangleSettings, Alignment},
 };
@@ -613,16 +616,14 @@ impl PanelSpace {
         let mut i = 0;
         let shrinkable = &mut clients.shrinkable;
         let unit_size = self.config.size.get_applet_icon_size_with_padding(true);
-        dbg!(overflow, shrinkable.len());
+        // dbg!(overflow, shrinkable.len(), clients.movable.len());
         while overflow > 0 && i < shrinkable.len() {
-            dbg!(overflow);
             let (w, _, min_units) = &mut shrinkable[i];
             let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
             let major_dim = if self.config.is_horizontal() { size.w } else { size.h };
             let unit_size = (major_dim as f32 / unit_size as f32).ceil() as u32;
             let new_dim = (major_dim as u32).saturating_sub(overflow).max(*min_units * unit_size);
             let diff = (major_dim as u32).saturating_sub(new_dim);
-            dbg!(new_dim);
             if diff == 0 {
                 i += 1;
                 continue;
@@ -649,10 +650,10 @@ impl PanelSpace {
                 section,
             );
         }
-        dbg!("finished", overflow);
         overflow
     }
 
+    /// Move clients to overflow space
     fn move_to_overflow(
         &mut self,
         mut overflow: u32,
@@ -660,11 +661,13 @@ impl PanelSpace {
         clients: OverflowClientPartition,
         section: OverflowSection,
     ) -> u32 {
+        let overflow_0 = overflow;
         let overflow_space = match section {
             OverflowSection::Left => &mut self.overflow_left,
             OverflowSection::Center => &mut self.overflow_center,
             OverflowSection::Right => &mut self.overflow_right,
         };
+        let had_overflow_prev = overflow_space.elements().next().is_some();
         let mut overflow_cnt = overflow_space.elements().count();
         let applet_size_unit = self.config.size.get_applet_icon_size(true)
             + 2 * self.config.size.get_applet_padding(true) as u32;
@@ -693,6 +696,32 @@ impl PanelSpace {
                 t.send_pending_configure();
             }
             overflow_space.map_element(w.0, (x, y), false);
+        }
+
+        if !had_overflow_prev && overflow != overflow_0 {
+            // TODO get the actual values
+            // TODO use a borrowed bool for selected
+            let overflow_button_loc = (0, 0);
+            let name = match section {
+                OverflowSection::Left => "left",
+                OverflowSection::Center => "center",
+                OverflowSection::Right => "right",
+            };
+            // if there was no overflow before, and there is now, then we need to add the overflow button
+            self.space.map_element(
+                CosmicMappedInternal::OverflowButton(OverflowButtonElement::new(
+                    name,
+                    (0, 0).into(),
+                    32,
+                    8.into(),
+                    Arc::new(AtomicBool::new(false)),
+                    "overflow".into(),
+                    self.loop_handle.clone(),
+                    self.colors.theme.clone(),
+                )),
+                overflow_button_loc,
+                false,
+            )
         }
 
         overflow

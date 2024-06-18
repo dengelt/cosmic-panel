@@ -7,14 +7,44 @@ use std::{
     },
 };
 
+use calloop::LoopHandle;
 // element for rendering a button that toggles the overflow popup when clicked
-use cosmic::{iced::Padding, iced_core::id, theme, Element};
+use cosmic::{iced::Padding, iced_core::id, theme, widget::Id, Element};
 use smithay::{
     desktop::space::SpaceElement,
     utils::{IsAlive, Logical, Point, Rectangle, Size},
 };
+use xdg_shell_wrapper::shared_state::GlobalState;
 
-use crate::iced::Program;
+use crate::iced::{IcedElement, Program};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+
+pub struct OverflowButtonElement(pub IcedElement<OverflowButton>);
+
+impl OverflowButtonElement {
+    pub fn new(
+        name: impl Into<Cow<'static, str>>,
+        pos: Point<i32, Logical>,
+        icon_size: u16,
+        button_padding: Padding,
+        selected: Arc<AtomicBool>,
+        icon: Cow<'static, str>,
+        handle: LoopHandle<'static, GlobalState<crate::space_container::SpaceContainer>>,
+        theme: cosmic::Theme,
+    ) -> Self {
+        let size = (
+            (icon_size as f32 + button_padding.horizontal()).round() as i32,
+            (icon_size as f32 + button_padding.vertical()).round() as i32,
+        );
+        Self(IcedElement::new(
+            OverflowButton::new(name, pos, icon_size, button_padding, selected, icon),
+            Size::from(size),
+            handle,
+            theme,
+        ))
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Message {
@@ -30,6 +60,19 @@ pub struct OverflowButton {
     /// Selected if the popup is open
     selected: Arc<AtomicBool>,
     icon: Cow<'static, str>,
+}
+
+impl OverflowButton {
+    pub fn new(
+        name: impl Into<std::borrow::Cow<'static, str>>,
+        pos: Point<i32, Logical>,
+        icon_size: u16,
+        button_padding: Padding,
+        selected: Arc<AtomicBool>,
+        icon: Cow<'static, str>,
+    ) -> Self {
+        Self { id: Id::new(name), pos, icon_size, button_padding, selected, icon }
+    }
 }
 
 impl PartialEq for OverflowButton {
@@ -83,18 +126,18 @@ impl Program for OverflowButton {
     }
 }
 
-impl IsAlive for OverflowButton {
+impl IsAlive for OverflowButtonElement {
     fn alive(&self) -> bool {
         true
     }
 }
 
-impl SpaceElement for OverflowButton {
+impl SpaceElement for OverflowButtonElement {
     fn bbox(&self) -> smithay::utils::Rectangle<i32, smithay::utils::Logical> {
-        Rectangle {
-            loc: self.pos,
-            size: Size::from((self.icon_size as i32, self.icon_size as i32)),
-        }
+        self.0.with_program(|p| Rectangle {
+            loc: p.pos,
+            size: Size::from((p.icon_size as i32, p.icon_size as i32)),
+        })
     }
 
     fn is_in_input_region(

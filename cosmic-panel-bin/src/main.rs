@@ -41,7 +41,7 @@ pub enum PanelCalloopMsg {
 fn main() -> Result<()> {
     let fmt_layer = fmt::layer().with_target(false);
     let filter_layer =
-        EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new("warn")).unwrap();
+        EnvFilter::try_from_default_env().or_else(|_| EnvFilter::try_new("info")).unwrap();
     if let Ok(journal_layer) = tracing_journald::layer() {
         tracing_subscriber::registry().with(journal_layer).with(filter_layer).init();
     } else {
@@ -77,10 +77,14 @@ fn main() -> Result<()> {
     let (calloop_tx, calloop_rx): (SyncSender<PanelCalloopMsg>, _) =
         calloop::channel::sync_channel(100);
 
-    let mut space =
-        space_container::SpaceContainer::new(config, applet_tx.clone(), calloop_tx.clone());
-
     let event_loop = calloop::EventLoop::try_new()?;
+
+    let mut space = space_container::SpaceContainer::new(
+        config,
+        applet_tx.clone(),
+        calloop_tx.clone(),
+        event_loop.handle(),
+    );
 
     let handle = event_loop.handle();
     match watch_config(&space.config, handle) {

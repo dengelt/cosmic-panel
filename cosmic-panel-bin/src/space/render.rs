@@ -15,7 +15,7 @@ use smithay::{
         element::{
             memory::MemoryRenderBufferRenderElement,
             surface::{render_elements_from_surface_tree, WaylandSurfaceRenderElement},
-            Element, RenderElement, UnderlyingStorage,
+            AsRenderElements, Element, RenderElement, UnderlyingStorage,
         },
         gles::{GlesError, GlesFrame, GlesRenderer},
         Bind, Frame, Renderer, Unbind,
@@ -30,7 +30,7 @@ pub(crate) enum PanelRenderElement {
         Rectangle<i32, Physical>,
     ),
     RoundedRectangle(RoundedRectangleShaderElement),
-    OverflowMenu(MemoryRenderBufferRenderElement<GlesRenderer>),
+    Iced(MemoryRenderBufferRenderElement<GlesRenderer>),
 }
 
 impl smithay::backend::renderer::element::Element for PanelRenderElement {
@@ -38,7 +38,7 @@ impl smithay::backend::renderer::element::Element for PanelRenderElement {
         match self {
             Self::Wayland(e, ..) => e.id(),
             Self::RoundedRectangle(e) => e.id(),
-            Self::OverflowMenu(e) => e.id(),
+            Self::Iced(e) => e.id(),
         }
     }
 
@@ -46,7 +46,7 @@ impl smithay::backend::renderer::element::Element for PanelRenderElement {
         match self {
             Self::Wayland(e, ..) => e.current_commit(),
             Self::RoundedRectangle(e) => e.current_commit(),
-            Self::OverflowMenu(e) => e.current_commit(),
+            Self::Iced(e) => e.current_commit(),
         }
     }
 
@@ -54,7 +54,7 @@ impl smithay::backend::renderer::element::Element for PanelRenderElement {
         match self {
             Self::Wayland(e, src, ..) => *src,
             Self::RoundedRectangle(e) => e.src(),
-            Self::OverflowMenu(e) => e.src(),
+            Self::Iced(e) => e.src(),
         }
     }
 
@@ -62,7 +62,7 @@ impl smithay::backend::renderer::element::Element for PanelRenderElement {
         match self {
             Self::Wayland(e, _, geo) => *geo,
             Self::RoundedRectangle(e) => e.geometry(scale),
-            Self::OverflowMenu(e) => e.geometry(scale),
+            Self::Iced(e) => e.geometry(scale),
         }
     }
 }
@@ -79,7 +79,7 @@ impl RenderElement<GlesRenderer> for PanelRenderElement {
         match self {
             Self::Wayland(e, ..) => e.draw(frame, src, dst, damage, opaque_regions),
             Self::RoundedRectangle(e) => e.draw(frame, src, dst, damage, opaque_regions),
-            Self::OverflowMenu(e) => e.draw(frame, src, dst, damage, opaque_regions),
+            Self::Iced(e) => e.draw(frame, src, dst, damage, opaque_regions),
         }
     }
 
@@ -87,7 +87,7 @@ impl RenderElement<GlesRenderer> for PanelRenderElement {
         match self {
             PanelRenderElement::Wayland(e, ..) => e.underlying_storage(renderer),
             PanelRenderElement::RoundedRectangle(e) => e.underlying_storage(renderer),
-            PanelRenderElement::OverflowMenu(e) => e.underlying_storage(renderer),
+            PanelRenderElement::Iced(e) => e.underlying_storage(renderer),
         }
     }
 }
@@ -167,6 +167,15 @@ impl PanelSpace {
                                     .to_f64()
                                     .to_physical(self.scale)
                                     .to_i32_round();
+                                if let CosmicMappedInternal::OverflowButton(b) = w {
+                                    return Some(
+                                        b.0.render_elements(renderer, loc, self.scale.into(), 1.0)
+                                            .into_iter()
+                                            .map(|r| PanelRenderElement::Iced(r))
+                                            .collect::<Vec<_>>(),
+                                    );
+                                }
+
                                 w.toplevel().map(|t| {
                                     render_elements_from_surface_tree(
                                         renderer,
@@ -177,30 +186,29 @@ impl PanelSpace {
                                         smithay::backend::renderer::element::Kind::Unspecified,
                                     )
                                     .into_iter()
-                                    .map(
-                                        |r: WaylandSurfaceRenderElement<GlesRenderer>| {
-                                            let mut src = r.src();
-                                            let mut geo = r.geometry(self.scale.into());
-                                            if let Some(size) = t.current_state().size {
-                                                let scaled_size = size
-                                                    .to_f64()
-                                                    .to_buffer(
-                                                        self.scale,
-                                                        smithay::utils::Transform::Normal,
-                                                    )
-                                                    .to_i32_ceil();
-                                                if size.w > 0 && scaled_size.w < src.size.w {
-                                                    src.size.w = scaled_size.w;
-                                                    geo.size.w = scaled_size.w.ceil() as i32;
-                                                }
-                                                if size.h > 0 && scaled_size.h < src.size.h {
-                                                    src.size.h = scaled_size.h;
-                                                    geo.size.h = scaled_size.h.ceil() as i32;
-                                                }
+                                    .map(|r: WaylandSurfaceRenderElement<GlesRenderer>| {
+                                        let mut src = r.src();
+                                        let mut geo = r.geometry(self.scale.into());
+                                        if let Some(size) = t.current_state().size {
+                                            let scaled_size = size
+                                                .to_f64()
+                                                .to_buffer(
+                                                    self.scale,
+                                                    smithay::utils::Transform::Normal,
+                                                )
+                                                .to_i32_ceil();
+                                            if size.w > 0 && scaled_size.w < src.size.w {
+                                                src.size.w = scaled_size.w;
+                                                geo.size.w = scaled_size.w.ceil() as i32;
                                             }
-                                            PanelRenderElement::Wayland(r, src, geo)
-                                        },
-                                    )
+                                            if size.h > 0 && scaled_size.h < src.size.h {
+                                                src.size.h = scaled_size.h;
+                                                geo.size.h = scaled_size.h.ceil() as i32;
+                                            }
+                                        }
+                                        PanelRenderElement::Wayland(r, src, geo)
+                                    })
+                                    .collect::<Vec<_>>()
                                 })
                             })
                             .flatten(),

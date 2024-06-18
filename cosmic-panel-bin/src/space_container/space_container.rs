@@ -1,15 +1,15 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
 use crate::{
     minimize::MinimizeApplet,
-    space::{AppletMsg, PanelSpace},
+    space::{AppletMsg, PanelColors, PanelSpace},
     PanelCalloopMsg,
 };
 use cctk::{
     cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1::ZcosmicToplevelHandleV1,
     toplevel_info::ToplevelInfo, workspace::WorkspaceGroup,
 };
-use cosmic::{cosmic_config::CosmicConfigEntry, iced::id};
+use cosmic::{cosmic_config::CosmicConfigEntry, iced::id, theme};
 use cosmic_panel_config::{
     CosmicPanelBackground, CosmicPanelConfig, CosmicPanelContainerConfig, CosmicPanelOuput,
     PanelAnchor,
@@ -60,11 +60,12 @@ pub struct SpaceContainer {
     pub(crate) toplevels: Vec<(ZcosmicToplevelHandleV1, ToplevelInfo)>,
     pub(crate) workspace_groups: Vec<WorkspaceGroup>,
     pub(crate) is_dark: bool,
-    pub(crate) light_bg: [f32; 4],
-    pub(crate) dark_bg: [f32; 4],
+    pub(crate) light_theme: cosmic::Theme,
+    pub(crate) dark_theme: cosmic::Theme,
     pub(crate) security_context_manager: Option<SecurityContextManager>,
     /// map from output name to minimized applet info
     pub(crate) minimized_applets: HashMap<String, MinimizeApplet>,
+    pub(crate) loop_handle: calloop::LoopHandle<'static, GlobalState<SpaceContainer>>,
 }
 
 impl SpaceContainer {
@@ -72,6 +73,7 @@ impl SpaceContainer {
         config: CosmicPanelContainerConfig,
         tx: mpsc::Sender<AppletMsg>,
         panel_tx: calloop::channel::SyncSender<PanelCalloopMsg>,
+        loop_handle: calloop::LoopHandle<'static, GlobalState<SpaceContainer>>,
     ) -> Self {
         let is_dark = ThemeMode::config()
             .ok()
@@ -87,8 +89,6 @@ impl SpaceContainer {
             .ok()
             .and_then(|c| Theme::get_entry(&c).ok())
             .unwrap_or_else(|| Theme::dark_default());
-        let light = light.background.base;
-        let dark = dark.background.base;
 
         Self {
             connection: None,
@@ -106,40 +106,47 @@ impl SpaceContainer {
             toplevels: Vec::new(),
             workspace_groups: Vec::new(),
             is_dark,
-            light_bg: [light.red, light.green, light.blue, light.alpha],
-            dark_bg: [dark.red, dark.green, dark.blue, dark.alpha],
+            light_theme: cosmic::Theme::system(Arc::new(light)),
+            dark_theme: cosmic::Theme::system(Arc::new(dark)),
             security_context_manager: None,
             minimized_applets: HashMap::new(),
+            loop_handle,
         }
     }
 
-    pub fn set_dark(&mut self, color: [f32; 4]) {
-        self.dark_bg = color;
+    pub fn set_dark(&mut self, theme: theme::CosmicTheme) {
+        self.dark_theme = cosmic::Theme::system(Arc::new(theme));
 
         for space in &mut self.space_list {
             let is_dark = space.is_dark(self.is_dark);
             if is_dark {
-                space.set_theme_window_color(color);
+                space.set_theme(
+                    PanelColors::new(self.dark_theme.clone())
+                        .with_color_override(space.config.bg_color_override()),
+                );
             }
         }
     }
 
-    pub fn set_light(&mut self, color: [f32; 4]) {
-        self.light_bg = color;
+    pub fn set_light(&mut self, theme: theme::CosmicTheme) {
+        self.light_theme = cosmic::Theme::system(Arc::new(theme));
 
         for space in &mut self.space_list {
             let is_dark = space.is_dark(self.is_dark);
             if !is_dark {
-                space.set_theme_window_color(color);
+                space.set_theme(
+                    PanelColors::new(self.light_theme.clone())
+                        .with_color_override(space.config.bg_color_override()),
+                );
             }
         }
     }
 
-    pub fn cur_bg_color(&self) -> [f32; 4] {
+    pub fn cur_theme(&self) -> cosmic::Theme {
         if self.is_dark {
-            self.dark_bg.clone()
+            self.dark_theme.clone()
         } else {
-            self.light_bg.clone()
+            self.light_theme.clone()
         }
     }
 
@@ -180,10 +187,13 @@ impl SpaceContainer {
         let changed = self.is_dark != is_dark;
         self.is_dark = is_dark;
         if changed {
-            let cur = self.cur_bg_color();
+            let cur = self.cur_theme();
             for space in &mut self.space_list {
                 if matches!(space.config.background, CosmicPanelBackground::ThemeDefault) {
-                    space.set_theme_window_color(cur);
+                    space.set_theme(
+                        PanelColors::new(cur.clone())
+                            .with_color_override(space.config.bg_color_override()),
+                    );
                 }
             }
         }
@@ -304,13 +314,10 @@ impl SpaceContainer {
         self.config.config_list.push(entry.clone());
 
         if !must_recreate {
-            let mut bg_color = match entry.background {
-                CosmicPanelBackground::ThemeDefault => self.cur_bg_color(),
-                CosmicPanelBackground::Dark => self.dark_bg,
-                CosmicPanelBackground::Light => self.light_bg,
-                CosmicPanelBackground::Color(c) => [c[0], c[1], c[2], entry.opacity],
+            let bg_color = match entry.background {
+                CosmicPanelBackground::Color(c) => Some([c[0], c[1], c[2], entry.opacity]),
+                _ => None,
             };
-            bg_color[3] = entry.opacity;
 
             for space in &mut self.space_list {
                 if space.config.name != entry.name {
@@ -343,16 +350,18 @@ impl SpaceContainer {
                     self.c_hovered_surface.clone(),
                     self.applet_tx.clone(),
                     match entry.background {
-                        CosmicPanelBackground::ThemeDefault => self.cur_bg_color(),
-                        CosmicPanelBackground::Dark => self.dark_bg,
-                        CosmicPanelBackground::Light => self.light_bg,
-                        CosmicPanelBackground::Color(c) => [c[0], c[1], c[1], 1.0],
+                        CosmicPanelBackground::ThemeDefault | CosmicPanelBackground::Color(_) => {
+                            self.cur_theme()
+                        },
+                        CosmicPanelBackground::Dark => self.dark_theme.clone(),
+                        CosmicPanelBackground::Light => self.light_theme.clone(),
                     },
                     self.s_display.clone().unwrap(),
                     self.security_context_manager.clone(),
                     self.connection.as_ref().unwrap(),
                     self.panel_tx.clone(),
                     xdg_shell_wrapper::space::Visibility::Visible,
+                    self.loop_handle.clone(),
                 );
                 if let Err(err) = space.new_output(
                     compositor_state,
@@ -426,16 +435,18 @@ impl SpaceContainer {
                     self.c_hovered_surface.clone(),
                     self.applet_tx.clone(),
                     match entry.background {
-                        CosmicPanelBackground::ThemeDefault => self.cur_bg_color(),
-                        CosmicPanelBackground::Dark => self.dark_bg,
-                        CosmicPanelBackground::Light => self.light_bg,
-                        CosmicPanelBackground::Color(c) => [c[0], c[1], c[1], 1.0],
+                        CosmicPanelBackground::ThemeDefault | CosmicPanelBackground::Color(_) => {
+                            self.cur_theme()
+                        },
+                        CosmicPanelBackground::Dark => self.dark_theme.clone(),
+                        CosmicPanelBackground::Light => self.light_theme.clone(),
                     },
                     self.s_display.clone().unwrap(),
                     self.security_context_manager.clone(),
                     self.connection.as_ref().unwrap(),
                     self.panel_tx.clone(),
                     visible,
+                    self.loop_handle.clone(),
                 );
                 if let Some(s_display) = self.s_display.as_ref() {
                     space.set_display_handle(s_display.clone());
