@@ -743,13 +743,11 @@ where
             false
         };
         let _ = internal_ref.update(force);
-
         if let Some((buffer, ref mut old_primitives)) =
             internal_ref.buffers.get_mut(&OrderedFloat(scale.x))
         {
             let size: Size<i32, BufferCoords> =
                 internal_ref.size.to_f64().to_buffer(scale.x, Transform::Normal).to_i32_round();
-
             if size.w > 0 && size.h > 0 {
                 let IcedRenderer::TinySkia(renderer) = &mut internal_ref.renderer;
                 let state_ref = &internal_ref.state;
@@ -803,7 +801,6 @@ where
                                     )
                                 })
                                 .collect::<Vec<_>>();
-
                             state_ref.program().0.foreground(&mut pixels, &damage, scale.x as f32);
 
                             Result::<_, ()>::Ok(damage)

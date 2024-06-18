@@ -907,6 +907,7 @@ dependencies = [
  "libcosmic",
  "log-panics",
  "notify",
+ "once_cell",
  "ordered-float",
  "ron",
  "sendfd",

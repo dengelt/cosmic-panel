@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     hash::Hash,
+    rc::Rc,
     sync::{
         atomic::{self, AtomicBool},
         Arc,
@@ -9,7 +10,16 @@ use std::{
 
 use calloop::LoopHandle;
 // element for rendering a button that toggles the overflow popup when clicked
-use cosmic::{iced::Padding, iced_core::id, theme, widget::Id, Element};
+use cosmic::{
+    iced::{
+        alignment::{Horizontal, Vertical},
+        Length, Padding,
+    },
+    iced_core::id,
+    theme::{self, Button},
+    widget::{layer_container, Id},
+    Element,
+};
 use smithay::{
     desktop::space::SpaceElement,
     utils::{IsAlive, Logical, Point, Rectangle, Size},
@@ -18,32 +28,32 @@ use xdg_shell_wrapper::shared_state::GlobalState;
 
 use crate::iced::{IcedElement, Program};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub type OverflowButtonElement = IcedElement<OverflowButton>;
 
-pub struct OverflowButtonElement(pub IcedElement<OverflowButton>);
+pub fn overflow_button_element(
+    id: id::Id,
+    pos: Point<i32, Logical>,
+    icon_size: u16,
+    button_padding: Padding,
+    selected: Arc<AtomicBool>,
+    icon: Cow<'static, str>,
+    handle: LoopHandle<'static, GlobalState<crate::space_container::SpaceContainer>>,
+    theme: cosmic::Theme,
+) -> OverflowButtonElement {
+    let size = (
+        (icon_size as f32 + button_padding.horizontal()).round() as i32,
+        (icon_size as f32 + button_padding.vertical()).round() as i32,
+    );
+    IcedElement::new(
+        OverflowButton::new(id, pos, icon_size, button_padding, selected, icon),
+        Size::from(size),
+        handle,
+        theme,
+    )
+}
 
-impl OverflowButtonElement {
-    pub fn new(
-        name: impl Into<Cow<'static, str>>,
-        pos: Point<i32, Logical>,
-        icon_size: u16,
-        button_padding: Padding,
-        selected: Arc<AtomicBool>,
-        icon: Cow<'static, str>,
-        handle: LoopHandle<'static, GlobalState<crate::space_container::SpaceContainer>>,
-        theme: cosmic::Theme,
-    ) -> Self {
-        let size = (
-            (icon_size as f32 + button_padding.horizontal()).round() as i32,
-            (icon_size as f32 + button_padding.vertical()).round() as i32,
-        );
-        Self(IcedElement::new(
-            OverflowButton::new(name, pos, icon_size, button_padding, selected, icon),
-            Size::from(size),
-            handle,
-            theme,
-        ))
-    }
+pub fn with_id<T>(b: &OverflowButtonElement, f: impl Fn(&Id) -> T) -> T {
+    b.with_program(|p| f(&p.id))
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -64,14 +74,14 @@ pub struct OverflowButton {
 
 impl OverflowButton {
     pub fn new(
-        name: impl Into<std::borrow::Cow<'static, str>>,
+        id: id::Id,
         pos: Point<i32, Logical>,
         icon_size: u16,
         button_padding: Padding,
         selected: Arc<AtomicBool>,
         icon: Cow<'static, str>,
     ) -> Self {
-        Self { id: Id::new(name), pos, icon_size, button_padding, selected, icon }
+        Self { id, pos, icon_size, button_padding, selected, icon }
     }
 }
 
@@ -113,48 +123,24 @@ impl Program for OverflowButton {
 
     fn view(&self) -> crate::iced::Element<'_, Self::Message> {
         Element::from(
-            cosmic::widget::button::icon(
-                cosmic::widget::icon::from_name(self.icon.clone())
-                    .symbolic(true)
-                    .size(self.icon_size),
+            cosmic::widget::button(
+                layer_container(
+                    cosmic::widget::icon(cosmic::widget::icon::from_name(self.icon.clone()).into())
+                        .style(theme::Svg::Custom(Rc::new(|theme| {
+                            cosmic::iced_style::svg::Appearance {
+                                color: Some(theme.cosmic().background.on.into()),
+                            }
+                        })))
+                        .width(Length::Fixed(self.icon_size as f32))
+                        .height(Length::Fixed(self.icon_size as f32)),
+                )
+                .align_x(Horizontal::Center)
+                .align_y(Vertical::Center)
+                .width(Length::Fixed(self.icon_size as f32 + self.button_padding.horizontal()))
+                .height(Length::Fixed(self.icon_size as f32 + self.button_padding.horizontal())),
             )
-            .style(theme::Button::AppletIcon)
-            .padding(self.button_padding)
-            .on_press(Message::TogglePopup)
-            .selected(self.selected.load(atomic::Ordering::SeqCst)),
+            .style(Button::AppletIcon)
+            .on_press(Message::TogglePopup),
         )
     }
-}
-
-impl IsAlive for OverflowButtonElement {
-    fn alive(&self) -> bool {
-        true
-    }
-}
-
-impl SpaceElement for OverflowButtonElement {
-    fn bbox(&self) -> smithay::utils::Rectangle<i32, smithay::utils::Logical> {
-        self.0.with_program(|p| Rectangle {
-            loc: p.pos,
-            size: Size::from((p.icon_size as i32, p.icon_size as i32)),
-        })
-    }
-
-    fn is_in_input_region(
-        &self,
-        point: &smithay::utils::Point<f64, smithay::utils::Logical>,
-    ) -> bool {
-        self.bbox().to_f64().contains(*point)
-    }
-
-    fn set_activate(&self, _activated: bool) {}
-
-    fn output_enter(
-        &self,
-        _output: &smithay::output::Output,
-        _overlap: smithay::utils::Rectangle<i32, smithay::utils::Logical>,
-    ) {
-    }
-
-    fn output_leave(&self, _output: &smithay::output::Output) {}
 }

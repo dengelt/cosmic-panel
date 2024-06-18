@@ -830,16 +830,18 @@ impl WrapperSpace for PanelSpace {
                     None
                 }
             }) {
-                // XXX HACK
                 let geo = w.bbox().to_f64().to_physical(1.0).to_logical(self.scale).to_i32_round();
-                if let Some(prev_kbd) = prev_foc {
-                    prev_kbd.0 = w.toplevel().expect("Missing toplevel").wl_surface().clone();
-                } else {
-                    self.s_focused_surface.push((
-                        w.toplevel().expect("Missing toplevel").wl_surface().clone(),
-                        seat_name.to_string(),
-                    ));
+                if let CosmicMappedInternal::Window(ref w) = w {
+                    if let Some(prev_kbd) = prev_foc {
+                        prev_kbd.0 = w.toplevel().expect("Missing toplevel").wl_surface().clone();
+                    } else {
+                        self.s_focused_surface.push((
+                            w.toplevel().expect("Missing toplevel").wl_surface().clone(),
+                            seat_name.to_string(),
+                        ));
+                    }
                 }
+
                 let prev_popup_client = self
                     .popups
                     .iter()
@@ -848,7 +850,7 @@ impl WrapperSpace for PanelSpace {
                     .map(|c| c.id());
 
                 let cur_client_hover_id =
-                    w.toplevel().expect("Missing toplevel").wl_surface().client().map(|c| c.id());
+                    w.toplevel().and_then(|t| t.wl_surface().client().map(|c| c.id()));
                 if prev_popup_client.is_some()
                     && prev_popup_client != cur_client_hover_id
                     && self.generated_ptr_event_count == 0
@@ -949,20 +951,26 @@ impl WrapperSpace for PanelSpace {
                             },
                         ];
                     }
+                } else if prev_popup_client.is_some() && self.generated_ptr_event_count == 0 {
+                    // TODO simulate button press on the overflow button...
                 }
-                if let Some((_, prev_foc)) = prev_hover.as_mut() {
-                    prev_foc.s_pos = relative_loc.to_f64();
-                    prev_foc.c_pos = geo.loc;
-                    prev_foc.surface = w.wl_surface().map(|w| w.into_owned()).unwrap();
-                    Some(prev_foc.clone())
+                if let CosmicMappedInternal::Window(w) = w {
+                    if let Some((_, prev_foc)) = prev_hover.as_mut() {
+                        prev_foc.s_pos = relative_loc.to_f64();
+                        prev_foc.c_pos = geo.loc;
+                        prev_foc.surface = w.wl_surface().map(|w| w.into_owned()).unwrap();
+                        Some(prev_foc.clone())
+                    } else {
+                        self.s_hovered_surface.push(ServerPointerFocus {
+                            surface: w.wl_surface().map(|w| w.into_owned()).unwrap(),
+                            seat_name: seat_name.to_string(),
+                            c_pos: geo.loc,
+                            s_pos: relative_loc.to_f64(),
+                        });
+                        self.s_hovered_surface.last().cloned()
+                    }
                 } else {
-                    self.s_hovered_surface.push(ServerPointerFocus {
-                        surface: w.wl_surface().map(|w| w.into_owned()).unwrap(),
-                        seat_name: seat_name.to_string(),
-                        c_pos: geo.loc,
-                        s_pos: relative_loc.to_f64(),
-                    });
-                    self.s_hovered_surface.last().cloned()
+                    None
                 }
             } else {
                 if let Some((prev_i, _)) = prev_hover {

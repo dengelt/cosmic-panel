@@ -169,7 +169,7 @@ impl PanelSpace {
                                     .to_i32_round();
                                 if let CosmicMappedInternal::OverflowButton(b) = w {
                                     return Some(
-                                        b.0.render_elements(renderer, loc, self.scale.into(), 1.0)
+                                        b.render_elements(renderer, loc, self.scale.into(), 1.0)
                                             .into_iter()
                                             .map(|r| PanelRenderElement::Iced(r))
                                             .collect::<Vec<_>>(),

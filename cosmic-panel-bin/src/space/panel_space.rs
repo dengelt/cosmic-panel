@@ -1080,6 +1080,7 @@ impl PanelSpace {
             1.0,
             smithay::utils::Transform::Flipped180,
         ));
+        self.space.refresh();
     }
 
     pub fn apply_positioner_state(
