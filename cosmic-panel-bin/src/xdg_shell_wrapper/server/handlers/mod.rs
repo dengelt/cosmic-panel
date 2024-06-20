@@ -390,7 +390,7 @@ impl SelectionHandler for GlobalState {
             None => return,
         };
         if let Some(offer) = seat.client.selection_offer.as_ref() {
-            unsafe { receive_to_fd(offer.inner(), mime_type, fd) }
+            receive_to_fd(offer.inner(), mime_type, fd)
         }
     }
 }
