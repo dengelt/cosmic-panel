@@ -1,13 +1,18 @@
 // From: https://github.com/rust-windowing/winit/blob/master/src/platform_impl/linux/wayland/types/wp_fractional_scaling.rs
 //! Handling of the fractional scaling.
 
-use sctk::reexports::client::globals::{BindError, GlobalList};
-use sctk::reexports::client::protocol::wl_surface::WlSurface;
-use sctk::reexports::client::Dispatch;
-use sctk::reexports::client::{delegate_dispatch, Connection, Proxy, QueueHandle};
-use sctk::reexports::protocols::wp::fractional_scale::v1::client::wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1;
-use sctk::reexports::protocols::wp::fractional_scale::v1::client::wp_fractional_scale_v1::Event as FractionalScalingEvent;
-use sctk::reexports::protocols::wp::fractional_scale::v1::client::wp_fractional_scale_v1::WpFractionalScaleV1;
+use sctk::reexports::{
+    client::{
+        delegate_dispatch,
+        globals::{BindError, GlobalList},
+        protocol::wl_surface::WlSurface,
+        Connection, Dispatch, Proxy, QueueHandle,
+    },
+    protocols::wp::fractional_scale::v1::client::{
+        wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1,
+        wp_fractional_scale_v1::{Event as FractionalScalingEvent, WpFractionalScaleV1},
+    },
+};
 
 use sctk::globals::GlobalData;
 

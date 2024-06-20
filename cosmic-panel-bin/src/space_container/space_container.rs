@@ -1,17 +1,18 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
-use crate::xdg_shell_wrapper::{
-    client_state::ClientFocus,
-    shared_state::GlobalState,
-    space::{Visibility, WrapperSpace},
-    wp_fractional_scaling::FractionalScalingManager,
-    wp_security_context::SecurityContextManager,
-    wp_viewporter::ViewporterState,
-};
 use crate::{
     minimize::MinimizeApplet,
     space::{AppletMsg, PanelColors, PanelSpace},
-    xdg_shell_wrapper, PanelCalloopMsg,
+    xdg_shell_wrapper,
+    xdg_shell_wrapper::{
+        client_state::ClientFocus,
+        shared_state::GlobalState,
+        space::{Visibility, WrapperSpace},
+        wp_fractional_scaling::FractionalScalingManager,
+        wp_security_context::SecurityContextManager,
+        wp_viewporter::ViewporterState,
+    },
+    PanelCalloopMsg,
 };
 use cctk::{
     cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1::ZcosmicToplevelHandleV1,

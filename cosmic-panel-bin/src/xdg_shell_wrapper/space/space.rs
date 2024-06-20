@@ -90,8 +90,8 @@ impl Default for Visibility {
 }
 
 // TODO break this trait into several traits so that it can be better organized
-// not all "space" implementations really need all of these exact methods as long as they are wrapped by a space that does
-// see cosmic-panel for an example
+// not all "space" implementations really need all of these exact methods as
+// long as they are wrapped by a space that does see cosmic-panel for an example
 
 /// Wrapper Space
 /// manages and renders xdg-shell-window(s) on a layer shell surface
@@ -210,7 +210,8 @@ pub trait WrapperSpace {
 
     /// called in a loop by xdg-shell-wrapper
     /// handles events for the space
-    /// returns the Instant it was last updated by clients and a list of surfaces to request frames for
+    /// returns the Instant it was last updated by clients and a list of
+    /// surfaces to request frames for
     fn handle_events(
         &mut self,
         dh: &DisplayHandle,
@@ -240,7 +241,8 @@ pub trait WrapperSpace {
 
     /// Moves an already mapped Window to top of the stack
     /// This function does nothing for unmapped windows.
-    /// If activate is true it will set the new windows state to be activate and removes that state from every other mapped window.
+    /// If activate is true it will set the new windows state to be activate and
+    /// removes that state from every other mapped window.
     fn raise_window(&mut self, _: &Window, _: bool) {}
 
     /// marks the window as dirtied

@@ -59,18 +59,17 @@ impl PrimarySelectionHandler for GlobalState {
 
 delegate_primary_selection!(GlobalState);
 
-//
 // Wl Seat
 //
 
 impl SeatHandler for GlobalState {
+    type KeyboardFocus = WlSurface;
+    type PointerFocus = WlSurface;
+    type TouchFocus = WlSurface;
+
     fn seat_state(&mut self) -> &mut SeatState<Self> {
         &mut self.server_state.seat_state
     }
-
-    type KeyboardFocus = WlSurface;
-
-    type PointerFocus = WlSurface;
 
     fn focus_changed(
         &mut self,
@@ -157,13 +156,10 @@ impl SeatHandler for GlobalState {
             },
         }
     }
-
-    type TouchFocus = WlSurface;
 }
 
 delegate_seat!(GlobalState);
 
-//
 // Wl Data Device
 //
 
@@ -224,7 +220,7 @@ impl ClientDndGrabHandler for GlobalState {
                     };
                     let client_egl_surface = unsafe {
                         ClientEglSurface::new(
-                            WlEglSurface::new(client_surface.id(), 1, 1).unwrap(), // TODO remove unwrap
+                            WlEglSurface::new(client_surface.id(), 1, 1).unwrap(), /* TODO remove unwrap */
                             client_surface.clone(),
                         )
                     };
@@ -325,14 +321,12 @@ impl ServerDndGrabHandler for GlobalState {
 
 delegate_data_device!(GlobalState);
 
-//
 // Wl Output
 //
 
 delegate_output!(GlobalState);
 
 impl OutputHandler for GlobalState {}
-//
 // Dmabuf
 //
 impl DmabufHandler for GlobalState {

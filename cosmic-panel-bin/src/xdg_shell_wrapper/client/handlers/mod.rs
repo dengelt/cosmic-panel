@@ -33,10 +33,11 @@ impl ShmHandler for GlobalState {
 }
 
 impl ProvidesRegistryState for GlobalState {
+    registry_handlers![OutputState, SeatState,];
+
     fn registry(&mut self) -> &mut RegistryState {
         &mut self.client_state.registry_state
     }
-    registry_handlers![OutputState, SeatState,];
 }
 
 delegate_registry!(GlobalState);

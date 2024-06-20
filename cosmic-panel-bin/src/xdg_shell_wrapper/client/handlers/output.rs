@@ -2,9 +2,9 @@
 
 use sctk::{
     output::{Mode as c_Mode, OutputHandler, OutputInfo, OutputState},
-    reexports::{
-        client::protocol::wl_output::Subpixel as c_Subpixel,
-        client::{protocol::wl_output, Connection, QueueHandle},
+    reexports::client::{
+        protocol::{wl_output, wl_output::Subpixel as c_Subpixel},
+        Connection, QueueHandle,
     },
 };
 use smithay::{

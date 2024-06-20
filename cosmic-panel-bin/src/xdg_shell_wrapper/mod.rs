@@ -93,8 +93,8 @@ pub fn run(
         }
 
         // handle funky keyboard state.
-        // if a client layer shell surface is closed, then it won't receive the release event
-        // then the client will keep receiving input
+        // if a client layer shell surface is closed, then it won't receive the release
+        // event then the client will keep receiving input
         // so we send the release here instead
         let press = if let Some((key_pressed, kbd)) = global_state
             .client_state

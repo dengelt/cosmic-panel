@@ -797,7 +797,8 @@ impl PanelSpace {
                 OverflowSection::Center => Lazy::force(&CENTER_BTN).clone(),
                 OverflowSection::Right => Lazy::force(&RIGHT_BTN).clone(),
             };
-            // if there was no overflow before, and there is now, then we need to add the overflow button
+            // if there was no overflow before, and there is now, then we need to add the
+            // overflow button
 
             let icon_size = self.config.size.get_applet_icon_size(true);
             let padding = self.config.size.get_applet_padding(true);

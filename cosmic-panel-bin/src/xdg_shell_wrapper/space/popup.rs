@@ -2,18 +2,20 @@
 
 use std::rc::Rc;
 
-use sctk::shell::xdg::popup::Popup;
-use sctk::{compositor::Region, shell::xdg::XdgPositioner};
-use smithay::backend::renderer::damage::OutputDamageTracker;
-use smithay::utils::Size;
+use sctk::{
+    compositor::Region,
+    shell::xdg::{popup::Popup, XdgPositioner},
+};
 use smithay::{
-    backend::egl::surface::EGLSurface,
+    backend::{egl::surface::EGLSurface, renderer::damage::OutputDamageTracker},
     desktop::PopupManager,
-    utils::{Logical, Rectangle},
+    utils::{Logical, Rectangle, Size},
     wayland::shell::xdg::PopupSurface,
 };
-use wayland_protocols::wp::fractional_scale::v1::client::wp_fractional_scale_v1::WpFractionalScaleV1;
-use wayland_protocols::wp::viewporter::client::wp_viewport::WpViewport;
+use wayland_protocols::wp::{
+    fractional_scale::v1::client::wp_fractional_scale_v1::WpFractionalScaleV1,
+    viewporter::client::wp_viewport::WpViewport,
+};
 
 /// Popup events
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
@@ -69,8 +71,8 @@ pub struct WrapperPopup {
 }
 
 impl WrapperPopup {
-    /// Handles any events that have occurred since the last call, redrawing if needed.
-    /// Returns true if the surface is alive.
+    /// Handles any events that have occurred since the last call, redrawing if
+    /// needed. Returns true if the surface is alive.
     pub fn handle_events(&mut self, popup_manager: &mut PopupManager) -> bool {
         if let Some(WrapperPopupState::Rectangle { width, height, x, y }) = self.state {
             self.dirty = true;

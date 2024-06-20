@@ -1,21 +1,21 @@
 use std::rc::Rc;
 
-use sctk::reexports::client::Proxy;
-use sctk::shell::{
-    wlr_layer::{self, Anchor, KeyboardInteractivity},
-    WaylandSurface,
+use sctk::{
+    reexports::client::Proxy,
+    shell::{
+        wlr_layer::{self, Anchor, KeyboardInteractivity},
+        WaylandSurface,
+    },
 };
-use smithay::utils::{Logical, Size};
 use smithay::{
     backend::{
         egl::EGLSurface,
         renderer::{damage::OutputDamageTracker, utils::on_commit_buffer_handler, Bind, Unbind},
     },
     delegate_compositor, delegate_shm,
-    desktop::utils::bbox_from_surface_tree,
-    desktop::LayerSurface as SmithayLayerSurface,
+    desktop::{utils::bbox_from_surface_tree, LayerSurface as SmithayLayerSurface},
     reexports::wayland_server::protocol::{wl_buffer, wl_surface::WlSurface},
-    utils::Transform,
+    utils::{Logical, Size, Transform},
     wayland::{
         buffer::BufferHandler,
         compositor::{get_role, CompositorHandler, CompositorState},
@@ -60,8 +60,9 @@ impl CompositorHandler for GlobalState {
                     self.client_state.pending_layer_surfaces.swap_remove(pos);
                 // layer created by client
                 // request received here
-                // layer created in compositor & tracked by xdg-shell-wrapper in its own space that spans all outputs
-                // get renderer from wrapper space and draw to it
+                // layer created in compositor & tracked by xdg-shell-wrapper in its own space
+                // that spans all outputs get renderer from wrapper space and
+                // draw to it
                 let renderer = match self.space.renderer() {
                     Some(r) => r,
                     None => return,

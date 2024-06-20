@@ -1,13 +1,18 @@
 use std::os::fd::AsFd;
 
-use crate::xdg_shell_wrapper::client_state::FocusStatus;
-use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
-use sctk::data_device_manager::data_source::DataSourceHandler;
-use sctk::reexports::client::protocol::wl_data_device_manager::DndAction as ClientDndAction;
-use sctk::reexports::client::protocol::wl_data_source::WlDataSource;
-use sctk::seat::pointer::{PointerEvent, PointerEventKind, PointerHandler};
-use smithay::reexports::wayland_server::protocol::wl_data_device_manager::DndAction;
-use smithay::utils::SERIAL_COUNTER;
+use crate::xdg_shell_wrapper::{
+    client_state::FocusStatus, shared_state::GlobalState, space::WrapperSpace,
+};
+use sctk::{
+    data_device_manager::data_source::DataSourceHandler,
+    reexports::client::protocol::{
+        wl_data_device_manager::DndAction as ClientDndAction, wl_data_source::WlDataSource,
+    },
+    seat::pointer::{PointerEvent, PointerEventKind, PointerHandler},
+};
+use smithay::{
+    reexports::wayland_server::protocol::wl_data_device_manager::DndAction, utils::SERIAL_COUNTER,
+};
 
 impl DataSourceHandler for GlobalState {
     fn send_request(

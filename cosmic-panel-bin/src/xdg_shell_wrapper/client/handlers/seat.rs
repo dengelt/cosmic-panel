@@ -59,8 +59,9 @@ impl SeatHandler for GlobalState {
             // removed very well either and we don't want to crash applications, because the
             // user is replugging their keyboard or mouse.
             //
-            // So instead of doing the right thing (and initialize these capabilities as matching
-            // devices appear), we have to surrender to reality and just always expose a keyboard and pointer.
+            // So instead of doing the right thing (and initialize these capabilities as
+            // matching devices appear), we have to surrender to reality and
+            // just always expose a keyboard and pointer.
             new_server_seat.add_keyboard(Default::default(), 200, 20).unwrap();
             new_server_seat.add_pointer();
 
