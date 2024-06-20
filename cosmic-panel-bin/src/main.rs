@@ -4,7 +4,11 @@ mod minimize;
 mod notifications;
 mod space;
 mod space_container;
+mod xdg_shell_wrapper;
 
+use crate::xdg_shell_wrapper::{
+    client_state::ClientState, run, server_state::ServerState, shared_state::GlobalState,
+};
 use anyhow::Result;
 use cctk::{
     cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1,
@@ -26,9 +30,6 @@ use std::{
 use tokio::{runtime, sync::mpsc};
 use tracing::{error, info, warn};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-use xdg_shell_wrapper::{
-    client_state::ClientState, run, server_state::ServerState, shared_state::GlobalState,
-};
 
 #[derive(Debug)]
 pub enum PanelCalloopMsg {

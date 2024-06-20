@@ -25,7 +25,7 @@ use smithay::{
     reexports::wayland_server::Resource,
     utils::{IsAlive, Logical, Physical, Rectangle, Size},
 };
-use xdg_shell_wrapper::space::WrapperSpace;
+use crate::xdg_shell_wrapper::space::WrapperSpace;
 
 static LEFT_BTN: Lazy<id::Id> = Lazy::new(|| id::Id::new("LEFT_OVERFLOW_BTN"));
 static CENTER_BTN: Lazy<id::Id> = Lazy::new(|| id::Id::new("CENTER_OVERFLOW_BTN"));

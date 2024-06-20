@@ -2,14 +2,12 @@ use std::{
     borrow::Cow,
     hash::Hash,
     rc::Rc,
-    sync::{
-        atomic::{self, AtomicBool},
-        Arc,
-    },
+    sync::{atomic::AtomicBool, Arc},
 };
 
 use calloop::LoopHandle;
 // element for rendering a button that toggles the overflow popup when clicked
+use crate::xdg_shell_wrapper::{self, shared_state::GlobalState};
 use cosmic::{
     iced::{
         alignment::{Horizontal, Vertical},
@@ -24,7 +22,6 @@ use smithay::{
     desktop::space::SpaceElement,
     utils::{IsAlive, Logical, Point, Rectangle, Size},
 };
-use xdg_shell_wrapper::shared_state::GlobalState;
 
 use crate::iced::{IcedElement, Program};
 

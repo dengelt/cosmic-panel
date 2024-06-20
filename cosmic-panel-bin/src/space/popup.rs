@@ -8,7 +8,7 @@ use smithay::{
     utils::Rectangle,
 };
 use wayland_egl::WlEglSurface;
-use xdg_shell_wrapper::space::{ClientEglSurface, WrapperPopupState};
+use crate::xdg_shell_wrapper::space::{ClientEglSurface, WrapperPopupState};
 
 use super::PanelSpace;
 

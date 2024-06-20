@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use xdg_shell_wrapper::space::WorkspaceHandlerSpace;
+use crate::xdg_shell_wrapper::space::WorkspaceHandlerSpace;
 
 use super::SpaceContainer;
 

@@ -10,7 +10,7 @@ use cctk::{
 use cosmic_panel_config::{CosmicPanelBackground, PanelAnchor};
 use itertools::Itertools;
 use sctk::shell::WaylandSurface;
-use xdg_shell_wrapper::{
+use crate::xdg_shell_wrapper::{
     client_state::FocusStatus,
     space::{ToplevelInfoSpace, ToplevelManagerSpace, Visibility, WrapperSpace},
 };

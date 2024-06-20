@@ -62,7 +62,7 @@ use smithay::{
     },
     wayland::seat::WaylandFocus,
 };
-use xdg_shell_wrapper::shared_state::GlobalState;
+use crate::xdg_shell_wrapper::shared_state::GlobalState;
 
 pub mod elements;
 

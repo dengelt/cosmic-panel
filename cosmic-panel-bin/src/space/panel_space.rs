@@ -61,7 +61,7 @@ use wayland_protocols::{
     },
     xdg::shell::client::xdg_positioner::ConstraintAdjustment,
 };
-use xdg_shell_wrapper::{
+use crate::xdg_shell_wrapper::{
     client_state::{ClientFocus, FocusStatus},
     server_state::{ServerFocus, ServerPtrFocus},
     shared_state::GlobalState,

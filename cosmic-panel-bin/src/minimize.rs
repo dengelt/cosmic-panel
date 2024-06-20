@@ -1,9 +1,9 @@
+use crate::xdg_shell_wrapper::shared_state::GlobalState;
 use cctk::{
     cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1,
     wayland_client::{protocol::wl_surface::WlSurface, Proxy},
 };
 use smithay::utils::{Logical, Rectangle};
-use xdg_shell_wrapper::shared_state::GlobalState;
 
 use crate::space_container::SpaceContainer;
 

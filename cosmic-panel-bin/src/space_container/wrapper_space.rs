@@ -19,7 +19,7 @@ use smithay::{
     output::Output,
     reexports::wayland_server::{self, protocol::wl_surface, Resource},
 };
-use xdg_shell_wrapper::{
+use crate::xdg_shell_wrapper::{
     client_state::{ClientFocus, FocusStatus},
     server_state::ServerPointerFocus,
     shared_state::GlobalState,

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::space_container::SpaceContainer;
+use crate::xdg_shell_wrapper::shared_state::GlobalState;
 use anyhow::anyhow;
 use cosmic::{
     cosmic_config::{ConfigGet, CosmicConfigEntry},
@@ -11,7 +12,6 @@ use cosmic_theme::{Theme, ThemeMode};
 use notify::RecommendedWatcher;
 use smithay::reexports::calloop::{channel, LoopHandle};
 use tracing::{error, info};
-use xdg_shell_wrapper::shared_state::GlobalState;
 
 #[derive(Debug, Clone)]
 enum ConfigUpdate {

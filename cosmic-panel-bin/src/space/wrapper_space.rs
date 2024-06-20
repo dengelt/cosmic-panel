@@ -50,7 +50,7 @@ use smithay::{
 use tokio::sync::oneshot;
 use tracing::{error, error_span, info, info_span, trace};
 use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_shell_v1;
-use xdg_shell_wrapper::{
+use crate::xdg_shell_wrapper::{
     client_state::ClientFocus,
     server_state::ServerPointerFocus,
     shared_state::GlobalState,

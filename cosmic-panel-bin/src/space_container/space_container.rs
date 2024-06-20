@@ -1,9 +1,17 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, sync::Arc};
 
+use crate::xdg_shell_wrapper::{
+    client_state::ClientFocus,
+    shared_state::GlobalState,
+    space::{Visibility, WrapperSpace},
+    wp_fractional_scaling::FractionalScalingManager,
+    wp_security_context::SecurityContextManager,
+    wp_viewporter::ViewporterState,
+};
 use crate::{
     minimize::MinimizeApplet,
     space::{AppletMsg, PanelColors, PanelSpace},
-    PanelCalloopMsg,
+    xdg_shell_wrapper, PanelCalloopMsg,
 };
 use cctk::{
     cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1::ZcosmicToplevelHandleV1,
@@ -35,14 +43,6 @@ use smithay::{
 use tokio::sync::mpsc;
 use tracing::{error, info};
 use wayland_server::Resource;
-use xdg_shell_wrapper::{
-    client_state::ClientFocus,
-    shared_state::GlobalState,
-    space::{Visibility, WrapperSpace},
-    wp_fractional_scaling::FractionalScalingManager,
-    wp_security_context::SecurityContextManager,
-    wp_viewporter::ViewporterState,
-};
 
 pub struct SpaceContainer {
     pub(crate) connection: Option<Connection>,

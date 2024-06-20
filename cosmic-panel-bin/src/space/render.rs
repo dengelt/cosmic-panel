@@ -8,6 +8,7 @@ use super::{
 };
 use cctk::wayland_client::{Proxy, QueueHandle};
 
+use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 use sctk::shell::WaylandSurface;
 use smithay::{
     backend::renderer::{
@@ -22,7 +23,6 @@ use smithay::{
     },
     utils::{Buffer, Physical, Rectangle},
 };
-use xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 pub(crate) enum PanelRenderElement {
     Wayland(
         WaylandSurfaceRenderElement<GlesRenderer>,
@@ -118,7 +118,7 @@ impl PanelSpace {
             let clear_color = bg_color;
             // if not visible, just clear and exit early
             let not_visible = self.config.autohide.is_some()
-                && matches!(self.visibility, xdg_shell_wrapper::space::Visibility::Hidden);
+                && matches!(self.visibility, crate::xdg_shell_wrapper::space::Visibility::Hidden);
             let dim = self.dimensions.to_f64().to_physical(self.scale).to_i32_round();
             // TODO check to make sure this is not going to cause damage issues
             if not_visible {
