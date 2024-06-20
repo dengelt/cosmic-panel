@@ -102,36 +102,33 @@ fn main() -> Result<()> {
 
     event_loop
         .handle()
-        .insert_source(
-            calloop_rx,
-            move |e, _, state: &mut GlobalState<space_container::SpaceContainer>| {
-                match e {
-                    calloop::channel::Event::Msg(e) => match e {
-                        PanelCalloopMsg::ClientSocketPair(client_id) => {
-                            state.space.cleanup_client(client_id);
-                        },
-                        PanelCalloopMsg::RestartSpace(config, o) => {
-                            state.space.update_space(
-                                config,
-                                &state.client_state.compositor_state,
-                                state.client_state.fractional_scaling_manager.as_ref(),
-                                state.client_state.viewporter_state.as_ref(),
-                                &mut state.client_state.layer_state,
-                                &state.client_state.queue_handle,
-                                Some(o),
-                            );
-                        },
-                        PanelCalloopMsg::UpdateToplevel(toplevel) => {
-                            minimize::update_toplevel(state, toplevel)
-                        },
-                        PanelCalloopMsg::MinimizeRect { output, applet_info } => {
-                            minimize::set_rectangles(state, output, applet_info)
-                        },
+        .insert_source(calloop_rx, move |e, _, state: &mut GlobalState| {
+            match e {
+                calloop::channel::Event::Msg(e) => match e {
+                    PanelCalloopMsg::ClientSocketPair(client_id) => {
+                        state.space.cleanup_client(client_id);
                     },
-                    calloop::channel::Event::Closed => {},
-                };
-            },
-        )
+                    PanelCalloopMsg::RestartSpace(config, o) => {
+                        state.space.update_space(
+                            config,
+                            &state.client_state.compositor_state,
+                            state.client_state.fractional_scaling_manager.as_ref(),
+                            state.client_state.viewporter_state.as_ref(),
+                            &mut state.client_state.layer_state,
+                            &state.client_state.queue_handle,
+                            Some(o),
+                        );
+                    },
+                    PanelCalloopMsg::UpdateToplevel(toplevel) => {
+                        minimize::update_toplevel(state, toplevel)
+                    },
+                    PanelCalloopMsg::MinimizeRect { output, applet_info } => {
+                        minimize::set_rectangles(state, output, applet_info)
+                    },
+                },
+                calloop::channel::Event::Closed => {},
+            };
+        })
         .expect("failed to insert dbus event source");
 
     std::thread::spawn(move || -> anyhow::Result<()> {

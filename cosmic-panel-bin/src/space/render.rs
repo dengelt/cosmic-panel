@@ -93,11 +93,11 @@ impl RenderElement<GlesRenderer> for PanelRenderElement {
 }
 
 impl PanelSpace {
-    pub(crate) fn render<W: WrapperSpace>(
+    pub(crate) fn render(
         &mut self,
         renderer: &mut GlesRenderer,
         time: u32,
-        qh: &QueueHandle<GlobalState<W>>,
+        qh: &QueueHandle<GlobalState>,
     ) -> anyhow::Result<()> {
         if self.space_event.get() != None && (self.actual_size.w <= 20 || self.actual_size.h <= 20)
         {

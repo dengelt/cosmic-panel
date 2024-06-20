@@ -12,7 +12,7 @@ use wayland_client::{Connection, QueueHandle};
 use crate::space::{ToplevelInfoSpace, ToplevelManagerSpace};
 use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 
-impl<W: WrapperSpace + ToplevelManagerSpace> ToplevelManagerHandler for GlobalState<W> {
+impl< ToplevelManagerSpace> ToplevelManagerHandler for GlobalState {
     fn toplevel_manager_state(&mut self) -> &mut cctk::toplevel_management::ToplevelManagerState {
         self.client_state.toplevel_manager_state.as_mut().unwrap()
     }
@@ -29,7 +29,7 @@ impl<W: WrapperSpace + ToplevelManagerSpace> ToplevelManagerHandler for GlobalSt
     }
 }
 
-impl<W: WrapperSpace + ToplevelInfoSpace> ToplevelInfoHandler for GlobalState<W> {
+impl< ToplevelInfoSpace> ToplevelInfoHandler for GlobalState {
     fn toplevel_info_state(&mut self) -> &mut ToplevelInfoState {
         self.client_state.toplevel_info_state.as_mut().unwrap()
     }
@@ -82,5 +82,5 @@ impl<W: WrapperSpace + ToplevelInfoSpace> ToplevelInfoHandler for GlobalState<W>
     }
 }
 
-cctk::delegate_toplevel_info!(@<W: WrapperSpace + ToplevelInfoSpace + 'static> GlobalState<W>);
-cctk::delegate_toplevel_manager!(@<W: WrapperSpace + ToplevelManagerSpace + 'static> GlobalState<W>);
+cctk::delegate_toplevel_info!(@<W: WrapperSpace + ToplevelInfoSpace + 'static> GlobalState);
+cctk::delegate_toplevel_manager!(@<W: WrapperSpace + ToplevelManagerSpace + 'static> GlobalState);

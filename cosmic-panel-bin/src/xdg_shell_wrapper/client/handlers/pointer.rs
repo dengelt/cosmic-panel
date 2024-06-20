@@ -14,7 +14,7 @@ use smithay::{
     utils::{Point, SERIAL_COUNTER},
 };
 
-impl<W: WrapperSpace> PointerHandler for GlobalState<W> {
+impl PointerHandler for GlobalState {
     fn pointer_frame(
         &mut self,
         conn: &sctk::reexports::client::Connection,
@@ -54,7 +54,7 @@ impl<W: WrapperSpace> PointerHandler for GlobalState<W> {
     }
 }
 
-impl<W: WrapperSpace> GlobalState<W> {
+impl GlobalState {
     fn pointer_frame_inner(
         &mut self,
         conn: &sctk::reexports::client::Connection,
@@ -398,4 +398,4 @@ impl<W: WrapperSpace> GlobalState<W> {
     }
 }
 
-delegate_pointer!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_pointer!(GlobalState);

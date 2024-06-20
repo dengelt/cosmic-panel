@@ -8,9 +8,14 @@ use sctk::{
     },
 };
 
-use crate::xdg_shell_wrapper::{client_state::SurfaceState, shared_state::GlobalState, space::WrapperSpace};
+use crate::{
+    space_container::SpaceContainer,
+    xdg_shell_wrapper::{
+        client_state::SurfaceState, shared_state::GlobalState, space::WrapperSpace,
+    },
+};
 
-impl<W: WrapperSpace> LayerShellHandler for GlobalState<W> {
+impl LayerShellHandler for GlobalState {
     fn closed(
         &mut self,
         _conn: &sctk::reexports::client::Connection,
@@ -46,19 +51,17 @@ impl<W: WrapperSpace> LayerShellHandler for GlobalState<W> {
             match state {
                 SurfaceState::Waiting => {
                     state = SurfaceState::Dirty;
-                }
-                SurfaceState::Dirty => {}
+                },
+                SurfaceState::Dirty => {},
                 SurfaceState::WaitingFirst => {
                     state = SurfaceState::Waiting;
-                }
+                },
             };
             let (width, height) = configure.new_size;
 
-            s_layer_surface
-                .layer_surface()
-                .with_pending_state(|pending_state| {
-                    pending_state.size = Some((width as i32, height as i32).into());
-                });
+            s_layer_surface.layer_surface().with_pending_state(|pending_state| {
+                pending_state.size = Some((width as i32, height as i32).into());
+            });
             s_layer_surface.layer_surface().send_configure();
             c_layer_surface.set_size(width, height);
             c_layer_surface.wl_surface().commit();
@@ -68,4 +71,4 @@ impl<W: WrapperSpace> LayerShellHandler for GlobalState<W> {
     }
 }
 
-delegate_layer!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_layer!(GlobalState);

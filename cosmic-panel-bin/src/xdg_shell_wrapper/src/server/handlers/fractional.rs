@@ -9,7 +9,7 @@ use smithay::{
 
 use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 
-impl<W: WrapperSpace> FractionalScaleHandler for GlobalState<W> {
+impl FractionalScaleHandler for GlobalState {
     fn new_fractional_scale(&mut self, surface: WlSurface) {
         // Here we can set the initial fractional scale
         //
@@ -37,4 +37,4 @@ impl<W: WrapperSpace> FractionalScaleHandler for GlobalState<W> {
     }
 }
 
-delegate_fractional_scale!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_fractional_scale!(GlobalState);

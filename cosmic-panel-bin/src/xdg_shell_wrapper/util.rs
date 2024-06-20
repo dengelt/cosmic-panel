@@ -45,7 +45,7 @@ pub fn get_client_sock(display: &mut wayland_server::DisplayHandle) -> (Client, 
     )
 }
 
-pub(crate) fn write_and_attach_buffer<W: WrapperSpace + 'static>(
+pub(crate) fn write_and_attach_buffer(
     buffer_assignment: &BufferAssignment,
     cursor_surface: &WlSurface,
     multipool_ctr: usize,

@@ -5,8 +5,8 @@ use smithay::{
 
 use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 
-delegate_layer_shell!(@<W: WrapperSpace + 'static> GlobalState<W>);
-impl<W: WrapperSpace> WlrLayerShellHandler for GlobalState<W> {
+delegate_layer_shell!(GlobalState);
+impl WlrLayerShellHandler for GlobalState {
     fn shell_state(&mut self) -> &mut smithay::wayland::shell::wlr_layer::WlrLayerShellState {
         &mut self.server_state.layer_shell_state
     }
@@ -18,9 +18,7 @@ impl<W: WrapperSpace> WlrLayerShellHandler for GlobalState<W> {
         _layer: Layer,
         namespace: String,
     ) {
-        self.client_state
-            .pending_layer_surfaces
-            .push((surface, output, namespace));
+        self.client_state.pending_layer_surfaces.push((surface, output, namespace));
     }
 
     fn layer_destroyed(&mut self, surface: smithay::wayland::shell::wlr_layer::LayerSurface) {

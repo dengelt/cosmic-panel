@@ -110,26 +110,26 @@ pub trait WrapperSpace {
     fn get_client_focused_surface(&self) -> Rc<RefCell<ClientFocus>>;
 
     /// setup of the space after the wayland connection is ready
-    fn setup<W: WrapperSpace>(
+    fn setup(
         &mut self,
         compositor_state: &CompositorState,
-        fractional_scale_manager: Option<&FractionalScalingManager<W>>,
+        fractional_scale_manager: Option<&FractionalScalingManager>,
         security_context_manager: Option<SecurityContextManager>,
-        viewport: Option<&ViewporterState<W>>,
+        viewport: Option<&ViewporterState>,
         layer_state: &mut LayerShell,
         conn: &Connection,
-        qh: &QueueHandle<GlobalState<W>>,
+        qh: &QueueHandle<GlobalState>,
     );
 
     /// add the configured output to the space
-    fn new_output<W: WrapperSpace>(
+    fn new_output(
         &mut self,
         compositor_state: &CompositorState,
-        fractional_scale_manager: Option<&FractionalScalingManager<W>>,
-        viewport: Option<&ViewporterState<W>>,
+        fractional_scale_manager: Option<&FractionalScalingManager>,
+        viewport: Option<&ViewporterState>,
         layer_state: &mut LayerShell,
         conn: &Connection,
-        qh: &QueueHandle<GlobalState<W>>,
+        qh: &QueueHandle<GlobalState>,
         c_output: Option<c_wl_output::WlOutput>,
         s_output: Option<Output>,
         info: Option<OutputInfo>,
@@ -162,13 +162,13 @@ pub trait WrapperSpace {
     fn add_window(&mut self, s_top_level: Window);
 
     /// add a popup to the space
-    fn add_popup<W: WrapperSpace>(
+    fn add_popup(
         &mut self,
         compositor_state: &CompositorState,
-        fractional_scale_manager: Option<&FractionalScalingManager<W>>,
-        viewport: Option<&ViewporterState<W>>,
+        fractional_scale_manager: Option<&FractionalScalingManager>,
+        viewport: Option<&ViewporterState>,
         conn: &Connection,
-        qh: &QueueHandle<GlobalState<W>>,
+        qh: &QueueHandle<GlobalState>,
         xdg_shell_state: &mut XdgShell,
         s_surface: PopupSurface,
         positioner: XdgPositioner,
@@ -212,10 +212,10 @@ pub trait WrapperSpace {
     /// called in a loop by xdg-shell-wrapper
     /// handles events for the space
     /// returns the Instant it was last updated by clients and a list of surfaces to request frames for
-    fn handle_events<W: WrapperSpace>(
+    fn handle_events(
         &mut self,
         dh: &DisplayHandle,
-        qh: &QueueHandle<GlobalState<W>>,
+        qh: &QueueHandle<GlobalState>,
         popup_manager: &mut PopupManager,
         time: u32,
     ) -> Instant;
@@ -224,10 +224,10 @@ pub trait WrapperSpace {
     fn config(&self) -> Self::Config;
 
     /// spawns the clients for the wrapper
-    fn spawn_clients<W: WrapperSpace>(
+    fn spawn_clients(
         &mut self,
         display: wayland_server::DisplayHandle,
-        qh: &QueueHandle<GlobalState<W>>,
+        qh: &QueueHandle<GlobalState>,
         security_context_manager: Option<SecurityContextManager>,
     ) -> anyhow::Result<()>;
 

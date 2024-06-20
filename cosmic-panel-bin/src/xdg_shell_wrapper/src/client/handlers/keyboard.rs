@@ -18,7 +18,7 @@ use smithay::{
     utils::SERIAL_COUNTER,
 };
 
-impl<W: WrapperSpace> KeyboardHandler for GlobalState<W> {
+impl KeyboardHandler for GlobalState {
     fn enter(
         &mut self,
         _conn: &sctk::reexports::client::Connection,
@@ -284,4 +284,4 @@ impl<W: WrapperSpace> KeyboardHandler for GlobalState<W> {
     }
 }
 
-delegate_keyboard!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_keyboard!(GlobalState);

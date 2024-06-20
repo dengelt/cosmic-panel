@@ -1,8 +1,10 @@
-use crate::xdg_shell_wrapper::{
-    server_state::ServerState,
-    shared_state::GlobalState,
-    space::WrapperSpace,
-    space::{ToplevelInfoSpace, ToplevelManagerSpace, WorkspaceHandlerSpace},
+use crate::{
+    space_container::SpaceContainer,
+    xdg_shell_wrapper::{
+        server_state::ServerState,
+        shared_state::GlobalState,
+        space::{ToplevelInfoSpace, ToplevelManagerSpace, WorkspaceHandlerSpace, WrapperSpace},
+    },
 };
 use cctk::workspace::WorkspaceState;
 use cctk::{toplevel_info::ToplevelInfoState, toplevel_management::ToplevelManagerState};
@@ -103,7 +105,7 @@ pub enum FocusStatus {
 pub type ClientFocus = Vec<(wl_surface::WlSurface, String, FocusStatus)>;
 
 /// Wrapper client state
-pub struct ClientState<W: WrapperSpace + 'static> {
+pub struct ClientState {
     /// state
     pub registry_state: RegistryState,
     /// state
@@ -121,9 +123,9 @@ pub struct ClientState<W: WrapperSpace + 'static> {
     /// data device manager state
     pub data_device_manager: DataDeviceManagerState,
     /// fractional scaling manager
-    pub fractional_scaling_manager: Option<FractionalScalingManager<W>>,
+    pub fractional_scaling_manager: Option<FractionalScalingManager>,
     /// viewporter
-    pub viewporter_state: Option<ViewporterState<W>>,
+    pub viewporter_state: Option<ViewporterState>,
     /// toplevel_info_state
     pub toplevel_info_state: Option<ToplevelInfoState>,
     /// toplevel_manager_state
@@ -135,7 +137,7 @@ pub struct ClientState<W: WrapperSpace + 'static> {
 
     pub(crate) connection: Connection,
     /// queue handle
-    pub queue_handle: QueueHandle<GlobalState<W>>, // TODO remove if never used
+    pub queue_handle: QueueHandle<GlobalState>, // TODO remove if never used
     /// state regarding the last embedded client surface with keyboard focus
     pub focused_surface: Rc<RefCell<ClientFocus>>,
     /// state regarding the last embedded client surface with keyboard focus
@@ -163,7 +165,7 @@ pub struct ClientState<W: WrapperSpace + 'static> {
     )>,
 }
 
-impl<W: WrapperSpace + std::fmt::Debug> Debug for ClientState<W> {
+impl Debug for ClientState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ClientState")
             .field("registry_state", &self.registry_state)
@@ -213,12 +215,12 @@ pub(crate) enum SurfaceState {
     Dirty,
 }
 
-impl<W: WrapperSpace + 'static> ClientState<W> {
+impl ClientState {
     /// Create a new client state
     pub fn new(
-        loop_handle: calloop::LoopHandle<'static, GlobalState<W>>,
-        space: &mut W,
-        _embedded_server_state: &mut ServerState<W>,
+        loop_handle: calloop::LoopHandle<'static, GlobalState>,
+        space: &mut SpaceContainer,
+        _embedded_server_state: &mut ServerState,
     ) -> anyhow::Result<Self> {
         /*
          * Initial setup
@@ -331,25 +333,19 @@ impl<W: WrapperSpace + 'static> ClientState<W> {
             *state = SurfaceState::Waiting;
         }
     }
-}
 
-impl<W: WrapperSpace + ToplevelInfoSpace> ClientState<W> {
     /// initialize the toplevel info state
     pub fn init_toplevel_info_state(&mut self) {
         self.toplevel_info_state =
             Some(ToplevelInfoState::new(&self.registry_state, &self.queue_handle));
     }
-}
 
-impl<W: WrapperSpace + ToplevelManagerSpace> ClientState<W> {
     /// initialize the toplevel manager state
     pub fn init_toplevel_manager_state(&mut self) {
         self.toplevel_manager_state =
             Some(ToplevelManagerState::new(&self.registry_state, &self.queue_handle));
     }
-}
 
-impl<W: WrapperSpace + WorkspaceHandlerSpace> ClientState<W> {
     /// initialize the toplevel manager state
     pub fn init_workspace_state(&mut self) {
         self.workspace_state = Some(WorkspaceState::new(&self.registry_state, &self.queue_handle));

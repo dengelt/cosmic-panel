@@ -25,7 +25,7 @@ use smithay::{
 
 use crate::xdg_shell_wrapper::{client_state::FocusStatus, shared_state::GlobalState, space::WrapperSpace};
 
-impl<W: WrapperSpace> DataDeviceHandler for GlobalState<W> {
+impl DataDeviceHandler for GlobalState {
     fn selection(
         &mut self,
         _conn: &sctk::reexports::client::Connection,

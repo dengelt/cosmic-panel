@@ -10,7 +10,7 @@ use sctk::{
 
 use crate::xdg_shell_wrapper::{client_state::SurfaceState, shared_state::GlobalState, space::WrapperSpace};
 
-impl<W: WrapperSpace> LayerShellHandler for GlobalState<W> {
+impl LayerShellHandler for GlobalState {
     fn closed(
         &mut self,
         _conn: &sctk::reexports::client::Connection,
@@ -68,4 +68,4 @@ impl<W: WrapperSpace> LayerShellHandler for GlobalState<W> {
     }
 }
 
-delegate_layer!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_layer!(GlobalState);

@@ -26,20 +26,20 @@ pub mod wp_fractional_scaling;
 pub mod wp_security_context;
 pub mod wp_viewporter;
 
-impl<W: WrapperSpace> ShmHandler for GlobalState<W> {
+impl ShmHandler for GlobalState {
     fn shm_state(&mut self) -> &mut Shm {
         &mut self.client_state.shm_state
     }
 }
 
-impl<W: WrapperSpace> ProvidesRegistryState for GlobalState<W> {
+impl ProvidesRegistryState for GlobalState {
     fn registry(&mut self) -> &mut RegistryState {
         &mut self.client_state.registry_state
     }
     registry_handlers![OutputState, SeatState,];
 }
 
-delegate_registry!(@<W: WrapperSpace + 'static> GlobalState<W>);
-delegate_compositor!(@<W: WrapperSpace + 'static> GlobalState<W>);
-delegate_output!(@<W: WrapperSpace + 'static> GlobalState<W>);
-delegate_shm!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_registry!(GlobalState);
+delegate_compositor!(GlobalState);
+delegate_output!(GlobalState);
+delegate_shm!(GlobalState);

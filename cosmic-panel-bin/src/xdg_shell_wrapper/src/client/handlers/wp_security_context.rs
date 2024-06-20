@@ -37,7 +37,7 @@ impl SecurityContextManager {
     /// Create new security context manager.
     pub fn new<T: 'static + WrapperSpace>(
         globals: &GlobalList,
-        queue_handle: &QueueHandle<GlobalState<T>>,
+        queue_handle: &QueueHandle<GlobalState>,
     ) -> Result<Self, BindError> {
         let manager = globals.bind(queue_handle, 1..=1, GlobalData)?;
         Ok(Self { manager })
@@ -46,7 +46,7 @@ impl SecurityContextManager {
     /// Create a new security context.
     pub fn create_listener<T: 'static + WrapperSpace>(
         &self,
-        qh: &QueueHandle<GlobalState<T>>,
+        qh: &QueueHandle<GlobalState>,
     ) -> std::io::Result<WpSecurityContextV1> {
         // create a close fd that we can use to close the listener
         let (close_fd_ours, close_fd) = rustix::pipe::pipe()?;
@@ -58,9 +58,7 @@ impl SecurityContextManager {
             listener.as_fd(),
             close_fd.as_fd(),
             qh,
-            SecurityContext {
-                conn: Arc::new(Mutex::new(None)),
-            },
+            SecurityContext { conn: Arc::new(Mutex::new(None)) },
         );
         let conn = UnixStream::connect_addr(&addr)?;
         // XXX make sure no one else can connect to the listener
@@ -80,37 +78,35 @@ impl SecurityContextManager {
     }
 }
 
-impl<T: 'static + WrapperSpace> Dispatch<WpSecurityContextManagerV1, GlobalData, GlobalState<T>>
+impl Dispatch<WpSecurityContextManagerV1, GlobalData, GlobalState>
     for WpSecurityContextManagerV1
 {
     fn event(
-        _state: &mut GlobalState<T>,
+        _state: &mut GlobalState,
         _proxy: &WpSecurityContextManagerV1,
         _event: <WpSecurityContextManagerV1 as cctk::wayland_client::Proxy>::Event,
         _data: &GlobalData,
         _conn: &cctk::wayland_client::Connection,
-        _qhandle: &cctk::wayland_client::QueueHandle<GlobalState<T>>,
+        _qhandle: &cctk::wayland_client::QueueHandle<GlobalState>,
     ) {
         // No events.
         unimplemented!()
     }
 }
 
-impl<T: 'static + WrapperSpace> Dispatch<WpSecurityContextV1, SecurityContext, GlobalState<T>>
-    for WpSecurityContextManagerV1
-{
+impl Dispatch<WpSecurityContextV1, SecurityContext, GlobalState> for WpSecurityContextManagerV1 {
     fn event(
-        _state: &mut GlobalState<T>,
+        _state: &mut GlobalState,
         _proxy: &WpSecurityContextV1,
         _event: <WpSecurityContextV1 as cctk::wayland_client::Proxy>::Event,
         _data: &SecurityContext,
         _conn: &cctk::wayland_client::Connection,
-        _qhandle: &cctk::wayland_client::QueueHandle<GlobalState<T>>,
+        _qhandle: &cctk::wayland_client::QueueHandle<GlobalState>,
     ) {
         // No events.
         unimplemented!()
     }
 }
 
-delegate_dispatch!(@<T: 'static + WrapperSpace> GlobalState<T>: [WpSecurityContextManagerV1: GlobalData] => WpSecurityContextManagerV1);
-delegate_dispatch!(@<T: 'static + WrapperSpace> GlobalState<T>: [WpSecurityContextV1: SecurityContext] => WpSecurityContextManagerV1);
+delegate_dispatch!(@<T: 'static + WrapperSpace> GlobalState: [WpSecurityContextManagerV1: GlobalData] => WpSecurityContextManagerV1);
+delegate_dispatch!(@<T: 'static + WrapperSpace> GlobalState: [WpSecurityContextV1: SecurityContext] => WpSecurityContextManagerV1);

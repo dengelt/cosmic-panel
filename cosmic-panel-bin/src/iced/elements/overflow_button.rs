@@ -34,7 +34,7 @@ pub fn overflow_button_element(
     button_padding: Padding,
     selected: Arc<AtomicBool>,
     icon: Cow<'static, str>,
-    handle: LoopHandle<'static, GlobalState<crate::space_container::SpaceContainer>>,
+    handle: LoopHandle<'static, GlobalState>,
     theme: cosmic::Theme,
 ) -> OverflowButtonElement {
     let size = (
@@ -102,10 +102,7 @@ impl Program for OverflowButton {
     fn update(
         &mut self,
         message: Self::Message,
-        loop_handle: &calloop::LoopHandle<
-            'static,
-            xdg_shell_wrapper::shared_state::GlobalState<crate::space_container::SpaceContainer>,
-        >,
+        loop_handle: &calloop::LoopHandle<'static, xdg_shell_wrapper::shared_state::GlobalState>,
     ) -> cosmic::Command<Self::Message> {
         match message {
             Message::TogglePopup => {

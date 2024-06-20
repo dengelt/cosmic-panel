@@ -22,8 +22,11 @@ use smithay::{
 };
 use tracing::error;
 
-use crate::xdg_shell_wrapper::{
-    client_state::ClientState, server_state::ServerState, space::WrapperSpace,
+use crate::{
+    space_container::SpaceContainer,
+    xdg_shell_wrapper::{
+        client_state::ClientState, server_state::ServerState, space::WrapperSpace,
+    },
 };
 
 /// group of info for an output
@@ -31,22 +34,22 @@ pub type OutputGroup = (Output, GlobalId, String, c_wl_output::WlOutput);
 
 /// the  global state for the embedded server state
 #[allow(missing_debug_implementations)]
-pub struct GlobalState<W: WrapperSpace + 'static> {
+pub struct GlobalState {
     /// the implemented space
-    pub space: W,
+    pub space: SpaceContainer,
     /// desktop client state
-    pub client_state: ClientState<W>,
+    pub client_state: ClientState,
     /// embedded server state
-    pub server_state: ServerState<W>,
+    pub server_state: ServerState,
     /// instant that the panel was started
     pub start_time: std::time::Instant,
 }
 
-impl<W: WrapperSpace + 'static> GlobalState<W> {
+impl GlobalState {
     pub(crate) fn new(
-        client_state: ClientState<W>,
-        server_state: ServerState<W>,
-        space: W,
+        client_state: ClientState,
+        server_state: ServerState,
+        space: SpaceContainer,
         start_time: std::time::Instant,
     ) -> Self {
         Self { space, client_state, server_state, start_time }
@@ -77,7 +80,7 @@ impl<W: WrapperSpace + 'static> GlobalState<W> {
     }
 }
 
-impl<W: WrapperSpace + 'static> GlobalState<W> {
+impl GlobalState {
     /// bind the display for the space
     pub fn bind_display(&mut self, dh: &DisplayHandle) {
         if let Some(renderer) = self.space.renderer() {
@@ -87,7 +90,7 @@ impl<W: WrapperSpace + 'static> GlobalState<W> {
             } else {
                 let dmabuf_formats = renderer.dmabuf_formats().into_iter().collect_vec();
                 let mut state = DmabufState::new();
-                let global = state.create_global::<GlobalState<W>>(dh, dmabuf_formats);
+                let global = state.create_global::<GlobalState>(dh, dmabuf_formats);
                 self.server_state.dmabuf_state.replace((state, global));
             }
         }

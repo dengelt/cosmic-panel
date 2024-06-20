@@ -13,7 +13,7 @@ use smithay::{
 
 use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 
-impl<W: WrapperSpace> XdgShellHandler for GlobalState<W> {
+impl XdgShellHandler for GlobalState {
     fn xdg_shell_state(&mut self) -> &mut XdgShellState {
         &mut self.server_state.xdg_shell_state
     }
@@ -46,10 +46,7 @@ impl<W: WrapperSpace> XdgShellHandler for GlobalState<W> {
             )
             .is_ok()
         {
-            self.server_state
-                .popup_manager
-                .track_popup(PopupKind::Xdg(surface.clone()))
-                .unwrap();
+            self.server_state.popup_manager.track_popup(PopupKind::Xdg(surface.clone())).unwrap();
             self.server_state.popup_manager.commit(surface.wl_surface());
         }
     }
@@ -90,9 +87,7 @@ impl<W: WrapperSpace> XdgShellHandler for GlobalState<W> {
         positioner: PositionerState,
         token: u32,
     ) {
-        let _ = self
-            .space
-            .reposition_popup(surface.clone(), positioner, token);
+        let _ = self.space.reposition_popup(surface.clone(), positioner, token);
         self.server_state.popup_manager.commit(surface.wl_surface());
     }
 
@@ -102,4 +97,4 @@ impl<W: WrapperSpace> XdgShellHandler for GlobalState<W> {
 }
 
 // Xdg Shell
-delegate_xdg_shell!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_xdg_shell!(GlobalState);

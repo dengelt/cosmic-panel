@@ -1,8 +1,11 @@
 use std::time::Instant;
 
-use crate::xdg_shell_wrapper::{
-    client_state::FocusStatus, server_state::SeatPair, shared_state::GlobalState,
-    space::WrapperSpace,
+use crate::{
+    space_container::SpaceContainer,
+    xdg_shell_wrapper::{
+        client_state::FocusStatus, server_state::SeatPair, shared_state::GlobalState,
+        space::WrapperSpace,
+    },
 };
 use sctk::{
     delegate_keyboard,
@@ -18,7 +21,7 @@ use smithay::{
     utils::SERIAL_COUNTER,
 };
 
-impl<W: WrapperSpace> KeyboardHandler for GlobalState<W> {
+impl KeyboardHandler for GlobalState {
     fn enter(
         &mut self,
         _conn: &sctk::reexports::client::Connection,
@@ -57,17 +60,15 @@ impl<W: WrapperSpace> KeyboardHandler for GlobalState<W> {
                 ));
             }
         }
-        let s_surface = self
-            .client_state
-            .proxied_layer_surfaces
-            .iter_mut()
-            .find_map(|(_, _, s, c, _, _, ..)| {
+        let s_surface = self.client_state.proxied_layer_surfaces.iter_mut().find_map(
+            |(_, _, s, c, _, _, ..)| {
                 if c.wl_surface() == surface {
                     Some(s.wl_surface().clone())
                 } else {
                     None
                 }
-            });
+            },
+        );
 
         if let Some(s_surface) = s_surface {
             kbd.set_focus(self, Some(s_surface), SERIAL_COUNTER.next_serial());
@@ -223,23 +224,20 @@ impl<W: WrapperSpace> KeyboardHandler for GlobalState<W> {
         info: RepeatInfo,
     ) {
         if let Some(kbd) =
-            self.server_state
-                .seats
-                .iter()
-                .find_map(|SeatPair { client, server, .. }| {
-                    client.kbd.as_ref().and_then(|k| {
-                        if k == kbd {
-                            server.seat.get_keyboard()
-                        } else {
-                            None
-                        }
-                    })
+            self.server_state.seats.iter().find_map(|SeatPair { client, server, .. }| {
+                client.kbd.as_ref().and_then(|k| {
+                    if k == kbd {
+                        server.seat.get_keyboard()
+                    } else {
+                        None
+                    }
                 })
+            })
         {
             match info {
                 RepeatInfo::Repeat { rate, delay } => {
                     kbd.change_repeat_info(u32::from(rate) as i32, delay.try_into().unwrap())
-                }
+                },
                 RepeatInfo::Disable => kbd.change_repeat_info(0, 0),
             };
         }
@@ -284,4 +282,4 @@ impl<W: WrapperSpace> KeyboardHandler for GlobalState<W> {
     }
 }
 
-delegate_keyboard!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_keyboard!(GlobalState);

@@ -23,9 +23,14 @@ use smithay::{
     },
 };
 
-use crate::xdg_shell_wrapper::{client_state::FocusStatus, shared_state::GlobalState, space::WrapperSpace};
+use crate::{
+    space_container::SpaceContainer,
+    xdg_shell_wrapper::{
+        client_state::FocusStatus, shared_state::GlobalState, space::WrapperSpace,
+    },
+};
 
-impl<W: WrapperSpace> DataDeviceHandler for GlobalState<W> {
+impl DataDeviceHandler for GlobalState {
     fn selection(
         &mut self,
         _conn: &sctk::reexports::client::Connection,
@@ -48,20 +53,13 @@ impl<W: WrapperSpace> DataDeviceHandler for GlobalState<W> {
             return;
         }
 
-        let offer = match data_device
-            .data::<DataDeviceData>()
-            .unwrap()
-            .selection_offer()
-        {
+        let offer = match data_device.data::<DataDeviceData>().unwrap().selection_offer() {
             Some(offer) => offer,
             None => return,
         };
         let wl_offer = offer.inner();
 
-        let mime_types = wl_offer
-            .data::<DataOfferData>()
-            .unwrap()
-            .with_mime_types(|m| m.to_vec());
+        let mime_types = wl_offer.data::<DataOfferData>().unwrap().with_mime_types(|m| m.to_vec());
 
         set_data_device_selection(
             &self.server_state.display_handle,
@@ -90,12 +88,8 @@ impl<W: WrapperSpace> DataDeviceHandler for GlobalState<W> {
             None => return,
         };
 
-        if let Some(f) = self
-            .client_state
-            .focused_surface
-            .borrow_mut()
-            .iter_mut()
-            .find(|f| f.1 == seat.name)
+        if let Some(f) =
+            self.client_state.focused_surface.borrow_mut().iter_mut().find(|f| f.1 == seat.name)
         {
             f.0 = surface.clone();
             f.2 = FocusStatus::Focused;
@@ -122,10 +116,7 @@ impl<W: WrapperSpace> DataDeviceHandler for GlobalState<W> {
 
         let wl_offer = offer.inner();
 
-        let mime_types = wl_offer
-            .data::<DataOfferData>()
-            .unwrap()
-            .with_mime_types(|m| m.to_vec());
+        let mime_types = wl_offer.data::<DataOfferData>().unwrap().with_mime_types(|m| m.to_vec());
         let mut dnd_action = DndAction::empty();
         let c_action = offer.source_actions;
         if c_action.contains(ClientDndAction::Copy) {
@@ -136,15 +127,11 @@ impl<W: WrapperSpace> DataDeviceHandler for GlobalState<W> {
             dnd_action |= DndAction::Ask;
         }
 
-        let metadata = SourceMetadata {
-            mime_types,
-            dnd_action,
-        };
+        let metadata = SourceMetadata { mime_types, dnd_action };
         let (x, y) = (offer.x, offer.y);
 
         let server_focus =
-            self.space
-                .update_pointer((x as i32, y as i32), &seat.name, offer.surface.clone());
+            self.space.update_pointer((x as i32, y as i32), &seat.name, offer.surface.clone());
 
         seat.client.dnd_offer = Some(offer);
         // TODO: touch vs pointer start data
@@ -182,12 +169,8 @@ impl<W: WrapperSpace> DataDeviceHandler for GlobalState<W> {
         };
         let c_ptr = seat.client.ptr.as_ref().map(|p| p.pointer().clone());
         let s_ptr = seat.server.seat.get_pointer();
-        let surface = if let Some(f) = self
-            .client_state
-            .focused_surface
-            .borrow_mut()
-            .iter_mut()
-            .find(|f| f.1 == seat.name)
+        let surface = if let Some(f) =
+            self.client_state.focused_surface.borrow_mut().iter_mut().find(|f| f.1 == seat.name)
         {
             f.2 = FocusStatus::LastFocused(Instant::now());
             f.0.clone()
@@ -206,9 +189,7 @@ impl<W: WrapperSpace> DataDeviceHandler for GlobalState<W> {
 
         let leave_event = PointerEvent {
             surface,
-            kind: PointerEventKind::Motion {
-                time: duration_since,
-            },
+            kind: PointerEventKind::Motion { time: duration_since },
             position: (0.0, 0.0),
         };
         if let Some(s) = s_ptr {
@@ -257,9 +238,7 @@ impl<W: WrapperSpace> DataDeviceHandler for GlobalState<W> {
         );
         let motion_event = PointerEvent {
             surface: offer.surface.clone(),
-            kind: PointerEventKind::Motion {
-                time: offer.time.unwrap_or_default(),
-            },
+            kind: PointerEventKind::Motion { time: offer.time.unwrap_or_default() },
             position: (offer.x, offer.y),
         };
 

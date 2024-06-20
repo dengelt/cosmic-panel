@@ -21,7 +21,7 @@ const SCALE_DENOMINATOR: f64 = 120.;
 
 /// Fractional scaling manager.
 #[derive(Debug, Clone)]
-pub struct FractionalScalingManager<T> {
+pub struct FractionalScalingManager {
     manager: WpFractionalScaleManagerV1,
 
     _phantom: PhantomData<T>,
@@ -34,58 +34,48 @@ pub struct FractionalScaling {
     surface: WlSurface,
 }
 
-impl<T: 'static + WrapperSpace> FractionalScalingManager<T> {
+impl FractionalScalingManager {
     /// Create new viewporter.
     pub fn new(
         globals: &GlobalList,
-        queue_handle: &QueueHandle<GlobalState<T>>,
+        queue_handle: &QueueHandle<GlobalState>,
     ) -> Result<Self, BindError> {
         let manager = globals.bind(queue_handle, 1..=1, GlobalData)?;
-        Ok(Self {
-            manager,
-            _phantom: PhantomData,
-        })
+        Ok(Self { manager, _phantom: PhantomData })
     }
 
     /// Create a fractional scaling object for a given surface.
     pub fn fractional_scaling(
         &self,
         surface: &WlSurface,
-        queue_handle: &QueueHandle<GlobalState<T>>,
+        queue_handle: &QueueHandle<GlobalState>,
     ) -> WpFractionalScaleV1 {
-        let data = FractionalScaling {
-            surface: surface.clone(),
-        };
-        self.manager
-            .get_fractional_scale(surface, queue_handle, data)
+        let data = FractionalScaling { surface: surface.clone() };
+        self.manager.get_fractional_scale(surface, queue_handle, data)
     }
 }
 
-impl<T: 'static + WrapperSpace> Dispatch<WpFractionalScaleManagerV1, GlobalData, GlobalState<T>>
-    for FractionalScalingManager<T>
-{
+impl Dispatch<WpFractionalScaleManagerV1, GlobalData, GlobalState> for FractionalScalingManager {
     fn event(
-        _: &mut GlobalState<T>,
+        _: &mut GlobalState,
         _: &WpFractionalScaleManagerV1,
         _: <WpFractionalScaleManagerV1 as Proxy>::Event,
         _: &GlobalData,
         _: &Connection,
-        _: &QueueHandle<GlobalState<T>>,
+        _: &QueueHandle<GlobalState>,
     ) {
         // No events.
     }
 }
 
-impl<T: 'static + WrapperSpace> Dispatch<WpFractionalScaleV1, FractionalScaling, GlobalState<T>>
-    for FractionalScalingManager<T>
-{
+impl Dispatch<WpFractionalScaleV1, FractionalScaling, GlobalState> for FractionalScalingManager {
     fn event(
-        state: &mut GlobalState<T>,
+        state: &mut GlobalState,
         _: &WpFractionalScaleV1,
         event: <WpFractionalScaleV1 as Proxy>::Event,
         data: &FractionalScaling,
         _: &Connection,
-        _: &QueueHandle<GlobalState<T>>,
+        _: &QueueHandle<GlobalState>,
     ) {
         if let FractionalScalingEvent::PreferredScale { scale } = event {
             state.scale_factor_changed(&data.surface, scale as f64 / SCALE_DENOMINATOR, false);
@@ -93,5 +83,5 @@ impl<T: 'static + WrapperSpace> Dispatch<WpFractionalScaleV1, FractionalScaling,
     }
 }
 
-delegate_dispatch!(@<T: 'static + WrapperSpace> GlobalState<T>: [WpFractionalScaleManagerV1: GlobalData] => FractionalScalingManager<T>);
-delegate_dispatch!(@<T: 'static + WrapperSpace> GlobalState<T>: [WpFractionalScaleV1: FractionalScaling] => FractionalScalingManager<T>);
+delegate_dispatch!(@<T: 'static + WrapperSpace> GlobalState: [WpFractionalScaleManagerV1: GlobalData] => FractionalScalingManager);
+delegate_dispatch!(@<T: 'static + WrapperSpace> GlobalState: [WpFractionalScaleV1: FractionalScaling] => FractionalScalingManager);

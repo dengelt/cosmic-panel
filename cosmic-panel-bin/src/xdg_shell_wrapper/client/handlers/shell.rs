@@ -5,7 +5,7 @@ use sctk::{
 
 use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 
-impl<W: WrapperSpace> PopupHandler for GlobalState<W> {
+impl PopupHandler for GlobalState {
     fn configure(
         &mut self,
         _conn: &sctk::reexports::client::Connection,
@@ -26,7 +26,7 @@ impl<W: WrapperSpace> PopupHandler for GlobalState<W> {
     }
 }
 
-impl<W: WrapperSpace> WindowHandler for GlobalState<W> {
+impl WindowHandler for GlobalState {
     fn request_close(
         &mut self,
         _conn: &sctk::reexports::client::Connection,
@@ -48,6 +48,6 @@ impl<W: WrapperSpace> WindowHandler for GlobalState<W> {
     }
 }
 
-delegate_xdg_window!(@<W: WrapperSpace + 'static> GlobalState<W>);
-delegate_xdg_shell!(@<W: WrapperSpace + 'static> GlobalState<W>);
-delegate_xdg_popup!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_xdg_window!(GlobalState);
+delegate_xdg_shell!(GlobalState);
+delegate_xdg_popup!(GlobalState);

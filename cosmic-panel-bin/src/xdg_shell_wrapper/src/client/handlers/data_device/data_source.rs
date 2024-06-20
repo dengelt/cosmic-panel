@@ -9,7 +9,7 @@ use sctk::seat::pointer::{PointerEvent, PointerEventKind, PointerHandler};
 use smithay::reexports::wayland_server::protocol::wl_data_device_manager::DndAction;
 use smithay::utils::SERIAL_COUNTER;
 
-impl<W: WrapperSpace> DataSourceHandler for GlobalState<W> {
+impl DataSourceHandler for GlobalState {
     fn send_request(
         &mut self,
         _conn: &sctk::reexports::client::Connection,

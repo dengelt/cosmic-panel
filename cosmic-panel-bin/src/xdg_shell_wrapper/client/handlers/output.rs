@@ -20,7 +20,7 @@ use crate::xdg_shell_wrapper::{
     space::WrapperSpace,
 };
 
-impl<W: WrapperSpace> OutputHandler for GlobalState<W> {
+impl OutputHandler for GlobalState {
     fn output_state(&mut self) -> &mut OutputState {
         &mut self.client_state.output_state
     }
@@ -56,16 +56,11 @@ impl<W: WrapperSpace> OutputHandler for GlobalState<W> {
             xdg_shell_wrapper_config::WrapperOutput::Name(list) => list,
         };
 
-        if configured_outputs
-            .iter()
-            .any(|configured| Some(configured) == info.name.as_ref())
-        {
+        if configured_outputs.iter().any(|configured| Some(configured) == info.name.as_ref()) {
             // construct a surface for an output if possible
-            let s_output = c_output_as_s_output::<W>(display_handle, &info);
+            let s_output = c_output_as_s_output(display_handle, &info);
 
-            self.client_state
-                .outputs
-                .push((output.clone(), s_output.0.clone(), s_output.1));
+            self.client_state.outputs.push((output.clone(), s_output.0.clone(), s_output.1));
             if let Err(err) = space.new_output(
                 compositor_state,
                 fractional_scaling_manager.as_ref(),
@@ -113,17 +108,14 @@ impl<W: WrapperSpace> OutputHandler for GlobalState<W> {
             xdg_shell_wrapper_config::WrapperOutput::Name(list) => list,
         };
 
-        if configured_outputs
-            .iter()
-            .any(|configured| Some(configured) == info.name.as_ref())
-        {
+        if configured_outputs.iter().any(|configured| Some(configured) == info.name.as_ref()) {
             if let Some(saved_output) = self.client_state.outputs.iter_mut().find(|o| o.0 == output)
             {
                 let res = space.update_output(output.clone(), saved_output.1.clone(), info.clone());
                 if let Err(err) = res {
                     error!("{}", err);
                 } else if matches!(res, Ok(false)) {
-                    let s_output = c_output_as_s_output::<W>(display_handle, &info);
+                    let s_output = c_output_as_s_output(display_handle, &info);
 
                     if let Err(err) = space.new_output(
                         compositor_state,
@@ -165,10 +157,7 @@ impl<W: WrapperSpace> OutputHandler for GlobalState<W> {
 
         info!("configured outputs {:?}", &configured_outputs);
 
-        if configured_outputs
-            .iter()
-            .any(|configured| Some(configured) == info.name.as_ref())
-        {
+        if configured_outputs.iter().any(|configured| Some(configured) == info.name.as_ref()) {
             if let Some(saved_output) = self.client_state.outputs.iter().position(|o| o.0 == output)
             {
                 let (c, s, _) = self.client_state.outputs.remove(saved_output);
@@ -181,10 +170,7 @@ impl<W: WrapperSpace> OutputHandler for GlobalState<W> {
 }
 
 /// convert client output to server output
-pub fn c_output_as_s_output<W: WrapperSpace + 'static>(
-    dh: &DisplayHandle,
-    info: &OutputInfo,
-) -> (Output, GlobalId) {
+pub fn c_output_as_s_output(dh: &DisplayHandle, info: &OutputInfo) -> (Output, GlobalId) {
     let s_output = Output::new(
         info.name.clone().unwrap_or_default(), // the name of this output,
         PhysicalProperties {
@@ -201,17 +187,8 @@ pub fn c_output_as_s_output<W: WrapperSpace + 'static>(
             model: info.model.clone(),       // model of the monitor
         },
     );
-    for c_Mode {
-        dimensions,
-        refresh_rate,
-        current,
-        preferred,
-    } in &info.modes
-    {
-        let s_mode = s_Mode {
-            size: (*dimensions).into(),
-            refresh: *refresh_rate,
-        };
+    for c_Mode { dimensions, refresh_rate, current, preferred } in &info.modes {
+        let s_mode = s_Mode { size: (*dimensions).into(), refresh: *refresh_rate };
         if *preferred {
             s_output.set_preferred(s_mode);
         }
@@ -225,6 +202,6 @@ pub fn c_output_as_s_output<W: WrapperSpace + 'static>(
         }
         s_output.add_mode(s_mode);
     }
-    let s_output_global = s_output.create_global::<GlobalState<W>>(dh);
+    let s_output_global = s_output.create_global::<GlobalState>(dh);
     (s_output, s_output_global)
 }

@@ -13,7 +13,7 @@ use crate::xdg_shell_wrapper::{
     space::WrapperSpace,
 };
 
-impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
+impl SeatHandler for GlobalState {
     fn seat_state(&mut self) -> &mut sctk::seat::SeatState {
         &mut self.client_state.seat_state
     }
@@ -231,4 +231,4 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
     }
 }
 
-delegate_seat!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_seat!(GlobalState);

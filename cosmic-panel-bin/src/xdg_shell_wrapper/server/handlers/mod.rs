@@ -51,19 +51,19 @@ pub(crate) mod layer;
 pub(crate) mod viewporter;
 pub(crate) mod xdg_shell;
 
-impl<W: WrapperSpace> PrimarySelectionHandler for GlobalState<W> {
+impl PrimarySelectionHandler for GlobalState {
     fn primary_selection_state(&self) -> &PrimarySelectionState {
         &self.server_state.primary_selection_state
     }
 }
 
-delegate_primary_selection!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_primary_selection!(GlobalState);
 
 //
 // Wl Seat
 //
 
-impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
+impl SeatHandler for GlobalState {
     fn seat_state(&mut self) -> &mut SeatState<Self> {
         &mut self.server_state.seat_state
     }
@@ -144,7 +144,7 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
                         ptr.set_cursor(last_enter, Some(&cursor_surface), hotspot.x, hotspot.y);
                         self.client_state.multipool_ctr += 1;
 
-                        if let Err(e) = write_and_attach_buffer::<W>(
+                        if let Err(e) = write_and_attach_buffer(
                             buf.as_ref().unwrap(),
                             &cursor_surface,
                             self.client_state.multipool_ctr,
@@ -161,19 +161,19 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
     type TouchFocus = WlSurface;
 }
 
-delegate_seat!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_seat!(GlobalState);
 
 //
 // Wl Data Device
 //
 
-impl<W: WrapperSpace> DataDeviceHandler for GlobalState<W> {
+impl DataDeviceHandler for GlobalState {
     fn data_device_state(&self) -> &smithay::wayland::selection::data_device::DataDeviceState {
         &self.server_state.data_device_state
     }
 }
 
-impl<W: WrapperSpace> ClientDndGrabHandler for GlobalState<W> {
+impl ClientDndGrabHandler for GlobalState {
     fn started(&mut self, source: Option<WlDataSource>, icon: Option<WlSurface>, seat: Seat<Self>) {
         let seat = match self.server_state.seats.iter_mut().find(|s| s.server.seat == seat) {
             Some(s) => s,
@@ -270,7 +270,7 @@ impl<W: WrapperSpace> ClientDndGrabHandler for GlobalState<W> {
         seat.client.dnd_source = None;
     }
 }
-impl<W: WrapperSpace> ServerDndGrabHandler for GlobalState<W> {
+impl ServerDndGrabHandler for GlobalState {
     fn send(&mut self, mime_type: String, fd: OwnedFd, seat: Seat<Self>) {
         let seat = match self.server_state.seats.iter().find(|s| s.server.seat == seat) {
             Some(s) => s,
@@ -323,19 +323,19 @@ impl<W: WrapperSpace> ServerDndGrabHandler for GlobalState<W> {
     }
 }
 
-delegate_data_device!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_data_device!(GlobalState);
 
 //
 // Wl Output
 //
 
-delegate_output!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_output!(GlobalState);
 
-impl<W: WrapperSpace> OutputHandler for GlobalState<W> {}
+impl OutputHandler for GlobalState {}
 //
 // Dmabuf
 //
-impl<W: WrapperSpace> DmabufHandler for GlobalState<W> {
+impl DmabufHandler for GlobalState {
     fn dmabuf_state(&mut self) -> &mut smithay::wayland::dmabuf::DmabufState {
         &mut self.server_state.dmabuf_state.as_mut().unwrap().0
     }
@@ -354,14 +354,14 @@ impl<W: WrapperSpace> DmabufHandler for GlobalState<W> {
     }
 }
 
-impl<W: WrapperSpace> SelectionHandler for GlobalState<W> {
+impl SelectionHandler for GlobalState {
     type SelectionUserData = ();
 
     fn new_selection(
         &mut self,
         target: SelectionTarget,
         source: Option<SelectionSource>,
-        seat: Seat<GlobalState<W>>,
+        seat: Seat<GlobalState>,
     ) {
         let seat = match self.server_state.seats.iter_mut().find(|s| s.server.seat == seat) {
             Some(s) => s,
@@ -401,4 +401,4 @@ impl<W: WrapperSpace> SelectionHandler for GlobalState<W> {
     }
 }
 
-delegate_dmabuf!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_dmabuf!(GlobalState);

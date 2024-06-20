@@ -7,9 +7,12 @@ use sctk::{
 };
 use smithay::reexports::wayland_server::protocol::wl_output::Transform;
 
-use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
+use crate::{
+    space_container::SpaceContainer,
+    xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace},
+};
 
-impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
+impl CompositorHandler for GlobalState {
     fn scale_factor_changed(
         &mut self,
         _conn: &Connection,
@@ -28,12 +31,12 @@ impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
         time: u32,
     ) {
         // TODO proxied layer surfaces
-        if let Some(seat) = self.server_state.seats.iter_mut().find(|s| {
-            s.client
-                .dnd_icon
-                .iter()
-                .any(|dnd_icon| &dnd_icon.1 == surface)
-        }) {
+        if let Some(seat) = self
+            .server_state
+            .seats
+            .iter_mut()
+            .find(|s| s.client.dnd_icon.iter().any(|dnd_icon| &dnd_icon.1 == surface))
+        {
             seat.client.dnd_icon.as_mut().unwrap().4 = Some(time);
             self.draw_dnd_icon();
         } else {
@@ -53,35 +56,32 @@ impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
                 let transform = match new_transform {
                     sctk::reexports::client::protocol::wl_output::Transform::Normal => {
                         Transform::Normal
-                    }
+                    },
                     sctk::reexports::client::protocol::wl_output::Transform::_90 => Transform::_90,
                     sctk::reexports::client::protocol::wl_output::Transform::_180 => {
                         Transform::_180
-                    }
+                    },
                     sctk::reexports::client::protocol::wl_output::Transform::_270 => {
                         Transform::_270
-                    }
+                    },
                     sctk::reexports::client::protocol::wl_output::Transform::Flipped => {
                         Transform::Flipped
-                    }
+                    },
                     sctk::reexports::client::protocol::wl_output::Transform::Flipped90 => {
                         Transform::Flipped90
-                    }
+                    },
                     sctk::reexports::client::protocol::wl_output::Transform::Flipped180 => {
                         Transform::Flipped180
-                    }
+                    },
                     sctk::reexports::client::protocol::wl_output::Transform::Flipped270 => {
                         Transform::Flipped270
-                    }
+                    },
                     _ => {
                         tracing::warn!("Received unknown transform.");
                         return;
-                    }
+                    },
                 };
-                tracked_surface
-                    .2
-                    .wl_surface()
-                    .preferred_buffer_transform(transform);
+                tracked_surface.2.wl_surface().preferred_buffer_transform(transform);
                 return;
             }
         }

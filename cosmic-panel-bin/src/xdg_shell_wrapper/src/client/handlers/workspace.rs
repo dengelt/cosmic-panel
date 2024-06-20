@@ -5,7 +5,7 @@ use crate::xdg_shell_wrapper::{
     space::{WorkspaceHandlerSpace, WrapperSpace},
 };
 
-impl<W: WrapperSpace + WorkspaceHandlerSpace> WorkspaceHandler for GlobalState<W> {
+impl< WorkspaceHandlerSpace> WorkspaceHandler for GlobalState {
     fn workspace_state(&mut self) -> &mut cctk::workspace::WorkspaceState {
         self.client_state.workspace_state.as_mut().unwrap()
     }
@@ -21,4 +21,4 @@ impl<W: WrapperSpace + WorkspaceHandlerSpace> WorkspaceHandler for GlobalState<W
     }
 }
 
-cctk::delegate_workspace!(@<W: WrapperSpace + WorkspaceHandlerSpace + 'static> GlobalState<W>);
+cctk::delegate_workspace!(@<W: WrapperSpace + WorkspaceHandlerSpace + 'static> GlobalState);

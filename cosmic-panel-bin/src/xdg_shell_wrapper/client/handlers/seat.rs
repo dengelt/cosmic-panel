@@ -13,7 +13,7 @@ use crate::xdg_shell_wrapper::{
     space::WrapperSpace,
 };
 
-impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
+impl SeatHandler for GlobalState {
     fn seat_state(&mut self) -> &mut sctk::seat::SeatState {
         &mut self.client_state.seat_state
     }
@@ -62,15 +62,10 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
             //
             // So instead of doing the right thing (and initialize these capabilities as matching
             // devices appear), we have to surrender to reality and just always expose a keyboard and pointer.
-            new_server_seat
-                .add_keyboard(Default::default(), 200, 20)
-                .unwrap();
+            new_server_seat.add_keyboard(Default::default(), 200, 20).unwrap();
             new_server_seat.add_pointer();
 
-            let data_device = self
-                .client_state
-                .data_device_manager
-                .get_data_device(qh, &seat);
+            let data_device = self.client_state.data_device_manager.get_data_device(qh, &seat);
 
             self.server_state.seats.push(SeatPair {
                 name,
@@ -113,29 +108,21 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
         } else {
             return;
         };
-        let sp = if let Some(sp) = self
-            .server_state
-            .seats
-            .iter_mut()
-            .find(|sp| sp.client._seat == seat)
+        let sp = if let Some(sp) =
+            self.server_state.seats.iter_mut().find(|sp| sp.client._seat == seat)
         {
             sp
         } else {
             let name = info.name.clone().unwrap_or_default();
-            let server = self
-                .server_state
-                .seat_state
-                .new_wl_seat(&self.server_state.display_handle, &name);
+            let server =
+                self.server_state.seat_state.new_wl_seat(&self.server_state.display_handle, &name);
             self.server_state.seats.push(SeatPair {
                 name,
                 client: ClientSeat {
                     _seat: seat.clone(),
                     kbd: None,
                     ptr: None,
-                    data_device: self
-                        .client_state
-                        .data_device_manager
-                        .get_data_device(qh, &seat),
+                    data_device: self.client_state.data_device_manager.get_data_device(qh, &seat),
                     copy_paste_source: None,
                     dnd_source: None,
                     selection_offer: None,
@@ -160,15 +147,12 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
         match capability {
             sctk::seat::Capability::Keyboard => {
                 if info.has_keyboard {
-                    sp.server
-                        .seat
-                        .add_keyboard(Default::default(), 200, 20)
-                        .unwrap();
+                    sp.server.seat.add_keyboard(Default::default(), 200, 20).unwrap();
                     if let Ok(kbd) = self.client_state.seat_state.get_keyboard(qh, &seat, None) {
                         sp.client.kbd.replace(kbd);
                     }
                 }
-            }
+            },
             sctk::seat::Capability::Pointer => {
                 if info.has_pointer {
                     sp.server.seat.add_pointer();
@@ -182,8 +166,8 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
                         sp.client.ptr.replace(ptr);
                     }
                 }
-            }
-            sctk::seat::Capability::Touch => {} // TODO
+            },
+            sctk::seat::Capability::Touch => {}, // TODO
             _ => unimplemented!(),
         }
     }
@@ -195,11 +179,8 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
         seat: wl_seat::WlSeat,
         capability: sctk::seat::Capability,
     ) {
-        let sp = if let Some(sp) = self
-            .server_state
-            .seats
-            .iter_mut()
-            .find(|sp| sp.client._seat == seat)
+        let sp = if let Some(sp) =
+            self.server_state.seats.iter_mut().find(|sp| sp.client._seat == seat)
         {
             sp
         } else {
@@ -208,21 +189,18 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
         match capability {
             sctk::seat::Capability::Keyboard => {
                 sp.server.seat.remove_keyboard();
-            }
+            },
             sctk::seat::Capability::Pointer => {
                 sp.server.seat.remove_pointer();
-            }
-            sctk::seat::Capability::Touch => {} // TODO
+            },
+            sctk::seat::Capability::Touch => {}, // TODO
             _ => unimplemented!(),
         }
     }
 
     fn remove_seat(&mut self, _conn: &Connection, _qh: &QueueHandle<Self>, seat: wl_seat::WlSeat) {
-        let _ = if let Some(sp_i) = self
-            .server_state
-            .seats
-            .iter()
-            .position(|sp| sp.client._seat == seat)
+        let _ = if let Some(sp_i) =
+            self.server_state.seats.iter().position(|sp| sp.client._seat == seat)
         {
             self.server_state.seats.swap_remove(sp_i)
         } else {
@@ -231,4 +209,4 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
     }
 }
 
-delegate_seat!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_seat!(GlobalState);

@@ -18,7 +18,7 @@ impl WorkspaceClientHandler for WrapperWorkspaceClientState {
     }
 }
 
-impl<W: WrapperSpace + 'static> WorkspaceHandler for GlobalState<W> {
+impl WorkspaceHandler for GlobalState {
     type Client = WrapperWorkspaceClientState;
 
     fn workspace_state(&self) -> &WorkspaceState<Self> {
@@ -39,4 +39,4 @@ impl ClientData for WrapperWorkspaceClientState {
     fn disconnected(&self, _client_id: ClientId, _reason: DisconnectReason) {}
 }
 
-delegate_workspace!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_workspace!(GlobalState);

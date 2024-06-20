@@ -38,17 +38,14 @@ pub fn get_client_sock(display: &mut wayland_server::DisplayHandle) -> (Client, 
         display
             .insert_client(
                 display_sock,
-                Arc::new(WrapperClientCompositorState {
-                    compositor_state: Default::default(),
-                }),
+                Arc::new(WrapperClientCompositorState { compositor_state: Default::default() }),
             )
             .unwrap(),
         client_sock,
     )
 }
 
-pub(crate) fn write_and_attach_buffer<W: WrapperSpace + 'static>(
-    buffer_assignment: &BufferAssignment,
+pub(crate) fn write_and_attach_buffer(    buffer_assignment: &BufferAssignment,
     cursor_surface: &WlSurface,
     multipool_ctr: usize,
     multipool: &mut MultiPool<(WlSurface, usize)>,
@@ -59,13 +56,7 @@ pub(crate) fn write_and_attach_buffer<W: WrapperSpace + 'static>(
                 source_buffer,
                 move |from: *const u8, length: usize, buffer_metadata: BufferData| {
                     if let Ok(format) = wl_shm::Format::try_from(buffer_metadata.format as u32) {
-                        let BufferData {
-                            offset,
-                            width,
-                            height,
-                            stride,
-                            ..
-                        } = buffer_metadata;
+                        let BufferData { offset, width, height, stride, .. } = buffer_metadata;
                         let Ok((_, buff, to)) = multipool.create_buffer(
                             width,
                             stride,

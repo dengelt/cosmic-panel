@@ -6,7 +6,7 @@ use cstk::{
 
 use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 
-impl<W: WrapperSpace + 'static> ToplevelInfoHandler for GlobalState<W> {
+impl ToplevelInfoHandler for GlobalState {
     fn toplevel_info_state(&self) -> &ToplevelInfoState<Self> {
         &self.server_state.toplevel_info_state
     }
@@ -16,7 +16,7 @@ impl<W: WrapperSpace + 'static> ToplevelInfoHandler for GlobalState<W> {
     }
 }
 
-impl<W: WrapperSpace + 'static> ToplevelManagementHandler for GlobalState<W> {
+impl ToplevelManagementHandler for GlobalState {
     fn toplevel_management_state(
         &mut self,
     ) -> &mut cstk::toplevel_management::ToplevelManagementState {
@@ -24,5 +24,5 @@ impl<W: WrapperSpace + 'static> ToplevelManagementHandler for GlobalState<W> {
     }
 }
 
-delegate_toplevel_info!(@<W: WrapperSpace + 'static> GlobalState<W>);
-delegate_toplevel_management!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_toplevel_info!(GlobalState);
+delegate_toplevel_management!(GlobalState);

@@ -65,7 +65,7 @@ pub struct SpaceContainer {
     pub(crate) security_context_manager: Option<SecurityContextManager>,
     /// map from output name to minimized applet info
     pub(crate) minimized_applets: HashMap<String, MinimizeApplet>,
-    pub(crate) loop_handle: calloop::LoopHandle<'static, GlobalState<SpaceContainer>>,
+    pub(crate) loop_handle: calloop::LoopHandle<'static, GlobalState>,
 }
 
 impl SpaceContainer {
@@ -73,7 +73,7 @@ impl SpaceContainer {
         config: CosmicPanelContainerConfig,
         tx: mpsc::Sender<AppletMsg>,
         panel_tx: calloop::channel::SyncSender<PanelCalloopMsg>,
-        loop_handle: calloop::LoopHandle<'static, GlobalState<SpaceContainer>>,
+        loop_handle: calloop::LoopHandle<'static, GlobalState>,
     ) -> Self {
         let is_dark = ThemeMode::config()
             .ok()
@@ -207,14 +207,14 @@ impl SpaceContainer {
     }
 
     /// apply a new or updated entry to the space list
-    pub fn update_space<W: WrapperSpace>(
+    pub fn update_space(
         &mut self,
         mut entry: CosmicPanelConfig,
         compositor_state: &sctk::compositor::CompositorState,
-        fractional_scale_manager: Option<&FractionalScalingManager<W>>,
-        viewport: Option<&ViewporterState<W>>,
+        fractional_scale_manager: Option<&FractionalScalingManager>,
+        viewport: Option<&ViewporterState>,
         layer_state: &mut LayerShell,
-        qh: &QueueHandle<GlobalState<W>>,
+        qh: &QueueHandle<GlobalState>,
         force_output: Option<WlOutput>,
     ) {
         // if the output is set to "all", we need to check if the config is the same for

@@ -25,6 +25,8 @@ use shared_state::GlobalState;
 use space::{Visibility, WrapperSpace};
 pub use xdg_shell_wrapper_config as config;
 
+use crate::space_container::SpaceContainer;
+
 mod client;
 mod server;
 /// shared state
@@ -35,12 +37,12 @@ pub mod space;
 pub mod util;
 
 /// run the cosmic panel xdg wrapper with the provided config
-pub fn run<W: WrapperSpace + 'static>(
-    mut space: W,
-    client_state: ClientState<W>,
-    embedded_server_state: ServerState<W>,
-    mut event_loop: calloop::EventLoop<'static, GlobalState<W>>,
-    mut server_display: Display<GlobalState<W>>,
+pub fn run(
+    mut space: SpaceContainer,
+    client_state: ClientState,
+    embedded_server_state: ServerState,
+    mut event_loop: calloop::EventLoop<'static, GlobalState>,
+    mut server_display: Display<GlobalState>,
 ) -> Result<()> {
     let start = std::time::Instant::now();
 
@@ -51,10 +53,7 @@ pub fn run<W: WrapperSpace + 'static>(
 
     global_state.space.setup(
         &global_state.client_state.compositor_state,
-        global_state
-            .client_state
-            .fractional_scaling_manager
-            .as_ref(),
+        global_state.client_state.fractional_scaling_manager.as_ref(),
         global_state.client_state.security_context_manager.clone(),
         global_state.client_state.viewporter_state.as_ref(),
         &mut global_state.client_state.layer_state,
@@ -110,13 +109,7 @@ pub fn run<W: WrapperSpace + 'static>(
                     .find(|s| s.name == global_state.client_state.last_key_pressed[key_pressed].0)
                     .and_then(|s| {
                         s.server.seat.get_keyboard().map(|kbd| {
-                            (
-                                global_state
-                                    .client_state
-                                    .last_key_pressed
-                                    .remove(key_pressed),
-                                kbd,
-                            )
+                            (global_state.client_state.last_key_pressed.remove(key_pressed), kbd)
                         })
                     })
             }) {

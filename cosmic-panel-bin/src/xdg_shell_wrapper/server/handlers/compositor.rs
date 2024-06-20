@@ -32,7 +32,7 @@ use crate::xdg_shell_wrapper::{
     space::{ClientEglSurface, WrapperSpace},
 };
 
-impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
+impl CompositorHandler for GlobalState {
     fn compositor_state(&mut self) -> &mut CompositorState {
         &mut self.server_state.compositor_state
     }
@@ -43,10 +43,10 @@ impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
         trace!("role: {:?} surface: {:?}", &role, &surface);
 
         if role == "xdg_toplevel".into() {
-            on_commit_buffer_handler::<GlobalState<W>>(surface);
+            on_commit_buffer_handler::<GlobalState>(surface);
             self.space.dirty_window(&dh, surface)
         } else if role == "xdg_popup".into() {
-            on_commit_buffer_handler::<GlobalState<W>>(surface);
+            on_commit_buffer_handler::<GlobalState>(surface);
             self.server_state.popup_manager.commit(surface);
             self.space.dirty_popup(&dh, surface);
         } else if role == "zwlr_layer_surface_v1".into() {
@@ -78,12 +78,10 @@ impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
                     size.h = 1.max(size.h);
                 }
 
-                let output = self.client_state.outputs.iter().find(|o| {
-                    output
-                        .as_ref()
-                        .map(|output| o.1.owns(&output))
-                        .unwrap_or_default()
-                });
+                let output =
+                    self.client_state.outputs.iter().find(|o| {
+                        output.as_ref().map(|output| o.1.owns(&output)).unwrap_or_default()
+                    });
                 let surface = self
                     .client_state
                     .compositor_state
@@ -103,13 +101,13 @@ impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
                 let interactivity = match state.keyboard_interactivity {
                     smithay::wayland::shell::wlr_layer::KeyboardInteractivity::None => {
                         KeyboardInteractivity::None
-                    }
+                    },
                     smithay::wayland::shell::wlr_layer::KeyboardInteractivity::Exclusive => {
                         KeyboardInteractivity::Exclusive
-                    }
+                    },
                     smithay::wayland::shell::wlr_layer::KeyboardInteractivity::OnDemand => {
                         KeyboardInteractivity::OnDemand
-                    }
+                    },
                 };
                 let client_surface = self.client_state.layer_state.create_layer_surface(
                     &self.client_state.queue_handle,
@@ -202,16 +200,13 @@ impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
             {
                 // XXX Hacky but we I'm not sure of a better way to do this.
                 let old_bbox = s_layer_surface.bbox().size;
-                on_commit_buffer_handler::<GlobalState<W>>(surface);
+                on_commit_buffer_handler::<GlobalState>(surface);
 
                 // s_layer_surface.layer_surface().ensure_configured();
                 let bbox = s_layer_surface.bbox().size;
 
-                let size: Size<i32, Logical> = bbox
-                    .to_f64()
-                    .to_physical(1.0)
-                    .to_logical(*scale)
-                    .to_i32_round();
+                let size: Size<i32, Logical> =
+                    bbox.to_f64().to_physical(1.0).to_logical(*scale).to_i32_round();
 
                 if size.w <= 0 || size.h <= 0 {
                     return;
@@ -222,8 +217,8 @@ impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
                 match state {
                     SurfaceState::WaitingFirst => {
                         return;
-                    }
-                    _ => {}
+                    },
+                    _ => {},
                 };
                 *state = SurfaceState::Dirty;
                 if old_bbox != bbox {
@@ -239,7 +234,7 @@ impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
             }
         } else if role == "dnd_icon".into() {
             // render dnd icon to the active dnd icon surface
-            on_commit_buffer_handler::<GlobalState<W>>(surface);
+            on_commit_buffer_handler::<GlobalState>(surface);
             let seat = match self
                 .server_state
                 .seats
@@ -250,7 +245,7 @@ impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
                 None => {
                     error!("dnd icon received, but no seat found");
                     return;
-                }
+                },
             };
             if let Some(c_icon) = seat.client.dnd_icon.as_mut() {
                 let size = bbox_from_surface_tree(surface, (0, 0)).size;
@@ -277,22 +272,19 @@ impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
         &self,
         client: &'a smithay::reexports::wayland_server::Client,
     ) -> &'a smithay::wayland::compositor::CompositorClientState {
-        &client
-            .get_data::<WrapperClientCompositorState>()
-            .unwrap()
-            .compositor_state
+        &client.get_data::<WrapperClientCompositorState>().unwrap().compositor_state
     }
 }
 
-impl<W: WrapperSpace> BufferHandler for GlobalState<W> {
+impl BufferHandler for GlobalState {
     fn buffer_destroyed(&mut self, _buffer: &wl_buffer::WlBuffer) {}
 }
 
-impl<W: WrapperSpace> ShmHandler for GlobalState<W> {
+impl ShmHandler for GlobalState {
     fn shm_state(&self) -> &ShmState {
         &self.server_state.shm_state
     }
 }
 
-delegate_compositor!(@<W: WrapperSpace + 'static> GlobalState<W>);
-delegate_shm!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_compositor!(GlobalState);
+delegate_shm!(GlobalState);

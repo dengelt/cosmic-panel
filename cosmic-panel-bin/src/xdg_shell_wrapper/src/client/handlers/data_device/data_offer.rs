@@ -3,7 +3,7 @@ use sctk::reexports::client::protocol::wl_data_device_manager::DndAction;
 
 use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 
-impl<W: WrapperSpace> DataOfferHandler for GlobalState<W> {
+impl DataOfferHandler for GlobalState {
     // TODO DnD
     fn source_actions(
         &mut self,

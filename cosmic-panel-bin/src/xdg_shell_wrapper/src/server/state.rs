@@ -17,7 +17,9 @@ use smithay::{
     },
 };
 
-use crate::xdg_shell_wrapper::{client_state::ClientSeat, shared_state::GlobalState, space::WrapperSpace};
+use crate::xdg_shell_wrapper::{
+    client_state::ClientSeat, shared_state::GlobalState, space::WrapperSpace,
+};
 
 /// list of focused surfaces and the seats that focus them
 
@@ -42,19 +44,19 @@ pub type ServerPtrFocus = Vec<ServerPointerFocus>;
 
 #[allow(missing_debug_implementations)]
 /// internal server state
-pub struct ServerState<W: WrapperSpace + 'static> {
+pub struct ServerState {
     /// popup manager
     pub popup_manager: PopupManager,
     pub(crate) display_handle: DisplayHandle,
     // pub(crate) selected_data_provider: SelectedDataProvider,
     pub(crate) last_button: Option<u32>,
-    pub(crate) seats: Vec<SeatPair<W>>,
+    pub(crate) seats: Vec<SeatPair>,
     // Smithay State
     pub(crate) compositor_state: CompositorState,
     pub(crate) xdg_shell_state: XdgShellState,
     pub(crate) shm_state: ShmState,
     pub(crate) _output_manager_state: OutputManagerState,
-    pub(crate) seat_state: SeatState<GlobalState<W>>,
+    pub(crate) seat_state: SeatState<GlobalState>,
     pub(crate) data_device_state: DataDeviceState,
     pub(crate) dmabuf_state: Option<(DmabufState, DmabufGlobal)>,
     pub(crate) primary_selection_state: PrimarySelectionState,
@@ -62,37 +64,37 @@ pub struct ServerState<W: WrapperSpace + 'static> {
     pub(crate) _fractional_scale_state: FractionalScaleManagerState,
 }
 
-impl<W: WrapperSpace> ServerState<W> {
+impl ServerState {
     /// create a new server state
-    pub fn new(dh: DisplayHandle) -> ServerState<W> {
+    pub fn new(dh: DisplayHandle) -> ServerState {
         ServerState {
             popup_manager: PopupManager::default(),
             display_handle: dh.clone(),
             last_button: None,
             seats: Vec::new(),
-            compositor_state: CompositorState::new::<GlobalState<W>>(&dh),
-            xdg_shell_state: XdgShellState::new::<GlobalState<W>>(&dh),
-            shm_state: ShmState::new::<GlobalState<W>>(&dh, vec![]),
-            _output_manager_state: OutputManagerState::new_with_xdg_output::<GlobalState<W>>(&dh),
+            compositor_state: CompositorState::new::<GlobalState>(&dh),
+            xdg_shell_state: XdgShellState::new::<GlobalState>(&dh),
+            shm_state: ShmState::new::<GlobalState>(&dh, vec![]),
+            _output_manager_state: OutputManagerState::new_with_xdg_output::<GlobalState>(&dh),
             seat_state: SeatState::new(),
-            data_device_state: DataDeviceState::new::<GlobalState<W>>(&dh),
-            primary_selection_state: PrimarySelectionState::new::<GlobalState<W>>(&dh),
-            layer_shell_state: WlrLayerShellState::new::<GlobalState<W>>(&dh),
-            _fractional_scale_state: FractionalScaleManagerState::new::<GlobalState<W>>(&dh),
+            data_device_state: DataDeviceState::new::<GlobalState>(&dh),
+            primary_selection_state: PrimarySelectionState::new::<GlobalState>(&dh),
+            layer_shell_state: WlrLayerShellState::new::<GlobalState>(&dh),
+            _fractional_scale_state: FractionalScaleManagerState::new::<GlobalState>(&dh),
             dmabuf_state: None,
         }
     }
 }
 
-pub(crate) struct ServerSeat<W: WrapperSpace + 'static> {
-    pub(crate) seat: Seat<GlobalState<W>>,
+pub(crate) struct ServerSeat {
+    pub(crate) seat: Seat<GlobalState>,
     pub(crate) selection_source: Option<WlDataSource>,
     pub(crate) dnd_source: Option<WlDataSource>,
     pub(crate) dnd_icon: Option<WlSurface>,
 }
 
-pub(crate) struct SeatPair<W: WrapperSpace + 'static> {
+pub(crate) struct SeatPair {
     pub(crate) name: String,
     pub(crate) client: ClientSeat,
-    pub(crate) server: ServerSeat<W>,
+    pub(crate) server: ServerSeat,
 }

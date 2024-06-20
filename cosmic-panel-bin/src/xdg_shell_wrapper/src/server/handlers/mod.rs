@@ -51,19 +51,19 @@ pub(crate) mod layer;
 pub(crate) mod viewporter;
 pub(crate) mod xdg_shell;
 
-impl<W: WrapperSpace> PrimarySelectionHandler for GlobalState<W> {
+impl PrimarySelectionHandler for GlobalState {
     fn primary_selection_state(&self) -> &PrimarySelectionState {
         &self.server_state.primary_selection_state
     }
 }
 
-delegate_primary_selection!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_primary_selection!(GlobalState);
 
 //
 // Wl Seat
 //
 
-impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
+impl SeatHandler for GlobalState {
     fn seat_state(&mut self) -> &mut SeatState<Self> {
         &mut self.server_state.seat_state
     }
@@ -92,11 +92,8 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
     ) {
         trace!("cursor icon");
 
-        let Some(seat_pair) = self
-            .server_state
-            .seats
-            .iter()
-            .find(|seat_pair| &seat_pair.server.seat == seat)
+        let Some(seat_pair) =
+            self.server_state.seats.iter().find(|seat_pair| &seat_pair.server.seat == seat)
         else {
             return;
         };
@@ -108,13 +105,13 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
             smithay::input::pointer::CursorImageStatus::Hidden => {
                 let ptr = ptr.pointer();
                 ptr.set_cursor(seat_pair.client.last_enter, None, 0, 0);
-            }
+            },
             smithay::input::pointer::CursorImageStatus::Named(icon) => {
                 trace!("Cursor image reset to default");
                 if let Err(err) = ptr.set_cursor(&self.client_state.connection, icon) {
                     error!("{}", err);
                 }
-            }
+            },
             smithay::input::pointer::CursorImageStatus::Surface(surface) => {
                 trace!("received surface with cursor image");
 
@@ -123,7 +120,7 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
                     None => {
                         error!("multipool is missing!");
                         return;
-                    }
+                    },
                 };
                 let cursor_surface = self.client_state.cursor_surface.get_or_insert_with(|| {
                     self.client_state
@@ -147,7 +144,7 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
                         ptr.set_cursor(last_enter, Some(&cursor_surface), hotspot.x, hotspot.y);
                         self.client_state.multipool_ctr += 1;
 
-                        if let Err(e) = write_and_attach_buffer::<W>(
+                        if let Err(e) = write_and_attach_buffer(
                             buf.as_ref().unwrap(),
                             &cursor_surface,
                             self.client_state.multipool_ctr,
@@ -157,33 +154,28 @@ impl<W: WrapperSpace> SeatHandler for GlobalState<W> {
                         }
                     }
                 });
-            }
+            },
         }
     }
 
     type TouchFocus = WlSurface;
 }
 
-delegate_seat!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_seat!(GlobalState);
 
 //
 // Wl Data Device
 //
 
-impl<W: WrapperSpace> DataDeviceHandler for GlobalState<W> {
+impl DataDeviceHandler for GlobalState {
     fn data_device_state(&self) -> &smithay::wayland::selection::data_device::DataDeviceState {
         &self.server_state.data_device_state
     }
 }
 
-impl<W: WrapperSpace> ClientDndGrabHandler for GlobalState<W> {
+impl ClientDndGrabHandler for GlobalState {
     fn started(&mut self, source: Option<WlDataSource>, icon: Option<WlSurface>, seat: Seat<Self>) {
-        let seat = match self
-            .server_state
-            .seats
-            .iter_mut()
-            .find(|s| s.server.seat == seat)
-        {
+        let seat = match self.server_state.seats.iter_mut().find(|s| s.server.seat == seat) {
             Some(s) => s,
             None => return,
         };
@@ -202,20 +194,13 @@ impl<W: WrapperSpace> ClientDndGrabHandler for GlobalState<W> {
                 actions |= ClientDndAction::Ask;
             }
 
-            let dnd_source = self
-                .client_state
-                .data_device_manager
-                .create_drag_and_drop_source(
-                    &self.client_state.queue_handle,
-                    metadata.mime_types.iter().map(|m| m.as_str()).collect_vec(),
-                    actions,
-                );
-            if let Some(focus) = self
-                .client_state
-                .focused_surface
-                .borrow()
-                .iter()
-                .find(|f| f.1 == seat.name)
+            let dnd_source = self.client_state.data_device_manager.create_drag_and_drop_source(
+                &self.client_state.queue_handle,
+                metadata.mime_types.iter().map(|m| m.as_str()).collect_vec(),
+                actions,
+            );
+            if let Some(focus) =
+                self.client_state.focused_surface.borrow().iter().find(|f| f.1 == seat.name)
             {
                 let c_icon_surface = icon.as_ref().map(|_| {
                     self.client_state
@@ -274,12 +259,7 @@ impl<W: WrapperSpace> ClientDndGrabHandler for GlobalState<W> {
     }
 
     fn dropped(&mut self, seat: Seat<Self>) {
-        let seat = match self
-            .server_state
-            .seats
-            .iter_mut()
-            .find(|s| s.server.seat == seat)
-        {
+        let seat = match self.server_state.seats.iter_mut().find(|s| s.server.seat == seat) {
             Some(s) => s,
             None => return,
         };
@@ -290,14 +270,9 @@ impl<W: WrapperSpace> ClientDndGrabHandler for GlobalState<W> {
         seat.client.dnd_source = None;
     }
 }
-impl<W: WrapperSpace> ServerDndGrabHandler for GlobalState<W> {
+impl ServerDndGrabHandler for GlobalState {
     fn send(&mut self, mime_type: String, fd: OwnedFd, seat: Seat<Self>) {
-        let seat = match self
-            .server_state
-            .seats
-            .iter()
-            .find(|s| s.server.seat == seat)
-        {
+        let seat = match self.server_state.seats.iter().find(|s| s.server.seat == seat) {
             Some(s) => s,
             None => return,
         };
@@ -307,12 +282,7 @@ impl<W: WrapperSpace> ServerDndGrabHandler for GlobalState<W> {
     }
 
     fn finished(&mut self, seat: Seat<Self>) {
-        let seat = match self
-            .server_state
-            .seats
-            .iter_mut()
-            .find(|s| s.server.seat == seat)
-        {
+        let seat = match self.server_state.seats.iter_mut().find(|s| s.server.seat == seat) {
             Some(s) => s,
             None => return,
         };
@@ -322,12 +292,7 @@ impl<W: WrapperSpace> ServerDndGrabHandler for GlobalState<W> {
     }
 
     fn cancelled(&mut self, seat: Seat<Self>) {
-        let seat = match self
-            .server_state
-            .seats
-            .iter_mut()
-            .find(|s| s.server.seat == seat)
-        {
+        let seat = match self.server_state.seats.iter_mut().find(|s| s.server.seat == seat) {
             Some(s) => s,
             None => return,
         };
@@ -337,12 +302,7 @@ impl<W: WrapperSpace> ServerDndGrabHandler for GlobalState<W> {
     }
 
     fn action(&mut self, action: DndAction, seat: Seat<Self>) {
-        let seat = match self
-            .server_state
-            .seats
-            .iter()
-            .find(|s| s.server.seat == seat)
-        {
+        let seat = match self.server_state.seats.iter().find(|s| s.server.seat == seat) {
             Some(s) => s,
             None => return,
         };
@@ -363,19 +323,19 @@ impl<W: WrapperSpace> ServerDndGrabHandler for GlobalState<W> {
     }
 }
 
-delegate_data_device!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_data_device!(GlobalState);
 
 //
 // Wl Output
 //
 
-delegate_output!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_output!(GlobalState);
 
-impl<W: WrapperSpace> OutputHandler for GlobalState<W> {}
+impl OutputHandler for GlobalState {}
 //
 // Dmabuf
 //
-impl<W: WrapperSpace> DmabufHandler for GlobalState<W> {
+impl DmabufHandler for GlobalState {
     fn dmabuf_state(&mut self) -> &mut smithay::wayland::dmabuf::DmabufState {
         &mut self.server_state.dmabuf_state.as_mut().unwrap().0
     }
@@ -386,31 +346,24 @@ impl<W: WrapperSpace> DmabufHandler for GlobalState<W> {
         dmabuf: smithay::backend::allocator::dmabuf::Dmabuf,
         _: ImportNotifier,
     ) {
-        if let Some(Err(err)) = self
-            .space
-            .renderer()
-            .map(|renderer| renderer.import_dmabuf(&dmabuf, None))
+        if let Some(Err(err)) =
+            self.space.renderer().map(|renderer| renderer.import_dmabuf(&dmabuf, None))
         {
             error!("Failed to import dmabuf: {}", err);
         }
     }
 }
 
-impl<W: WrapperSpace> SelectionHandler for GlobalState<W> {
+impl SelectionHandler for GlobalState {
     type SelectionUserData = ();
 
     fn new_selection(
         &mut self,
         target: SelectionTarget,
         source: Option<SelectionSource>,
-        seat: Seat<GlobalState<W>>,
+        seat: Seat<GlobalState>,
     ) {
-        let seat = match self
-            .server_state
-            .seats
-            .iter_mut()
-            .find(|s| s.server.seat == seat)
-        {
+        let seat = match self.server_state.seats.iter_mut().find(|s| s.server.seat == seat) {
             Some(s) => s,
             None => return,
         };
@@ -438,12 +391,7 @@ impl<W: WrapperSpace> SelectionHandler for GlobalState<W> {
         seat: Seat<Self>,
         _: &Self::SelectionUserData,
     ) {
-        let seat = match self
-            .server_state
-            .seats
-            .iter()
-            .find(|s| s.server.seat == seat)
-        {
+        let seat = match self.server_state.seats.iter().find(|s| s.server.seat == seat) {
             Some(s) => s,
             None => return,
         };
@@ -453,4 +401,4 @@ impl<W: WrapperSpace> SelectionHandler for GlobalState<W> {
     }
 }
 
-delegate_dmabuf!(@<W: WrapperSpace + 'static> GlobalState<W>);
+delegate_dmabuf!(GlobalState);

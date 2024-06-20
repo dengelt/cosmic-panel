@@ -9,7 +9,7 @@ use smithay::reexports::wayland_server::protocol::wl_output::Transform;
 
 use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 
-impl<W: WrapperSpace> CompositorHandler for GlobalState<W> {
+impl CompositorHandler for GlobalState {
     fn scale_factor_changed(
         &mut self,
         _conn: &Connection,

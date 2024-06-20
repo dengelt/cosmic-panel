@@ -6,4 +6,4 @@ pub mod data_device;
 pub mod data_offer;
 pub mod data_source;
 
-delegate_data_device!(@<W: WrapperSpace+ 'static> GlobalState<W>);
+delegate_data_device!(@<W: WrapperSpace+ 'static> GlobalState);
