@@ -1,8 +1,6 @@
 // From: https://github.com/rust-windowing/winit/blob/master/src/platform_impl/linux/wayland/types/wp_fractional_scaling.rs
 //! Handling of the fractional scaling.
 
-use std::marker::PhantomData;
-
 use sctk::reexports::client::globals::{BindError, GlobalList};
 use sctk::reexports::client::protocol::wl_surface::WlSurface;
 use sctk::reexports::client::Dispatch;
@@ -13,7 +11,7 @@ use sctk::reexports::protocols::wp::fractional_scale::v1::client::wp_fractional_
 
 use sctk::globals::GlobalData;
 
-use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
+use crate::xdg_shell_wrapper::shared_state::GlobalState;
 
 /// The scaling factor denominator.
 const SCALE_DENOMINATOR: f64 = 120.;

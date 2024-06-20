@@ -17,10 +17,7 @@ use smithay::{
     },
 };
 
-use crate::{
-    space_container::SpaceContainer,
-    xdg_shell_wrapper::{client_state::ClientSeat, shared_state::GlobalState, space::WrapperSpace},
-};
+use crate::xdg_shell_wrapper::{client_state::ClientSeat, shared_state::GlobalState};
 
 /// list of focused surfaces and the seats that focus them
 

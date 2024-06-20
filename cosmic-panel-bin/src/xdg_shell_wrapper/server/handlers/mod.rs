@@ -359,7 +359,7 @@ impl SelectionHandler for GlobalState {
 
     fn new_selection(
         &mut self,
-        target: SelectionTarget,
+        _target: SelectionTarget,
         source: Option<SelectionSource>,
         seat: Seat<GlobalState>,
     ) {
@@ -385,7 +385,7 @@ impl SelectionHandler for GlobalState {
 
     fn send_selection(
         &mut self,
-        target: SelectionTarget,
+        _target: SelectionTarget,
         mime_type: String,
         fd: OwnedFd,
         seat: Seat<Self>,

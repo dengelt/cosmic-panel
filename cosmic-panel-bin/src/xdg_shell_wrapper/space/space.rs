@@ -22,7 +22,6 @@ use sctk::{
 use smithay::{
     backend::renderer::gles::GlesRenderer,
     desktop::{PopupManager, Window},
-    input::pointer::PointerTarget,
     output::Output,
     reexports::wayland_server::{
         self, protocol::wl_surface::WlSurface as s_WlSurface, DisplayHandle,

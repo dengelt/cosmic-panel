@@ -1,25 +1,15 @@
 use std::time::Instant;
 
-use crate::{
-    space_container::SpaceContainer,
-    xdg_shell_wrapper::{
-        client_state::FocusStatus, server_state::SeatPair, shared_state::GlobalState,
-        space::WrapperSpace,
-    },
+use crate::xdg_shell_wrapper::{
+    client_state::FocusStatus, server_state::SeatPair, shared_state::GlobalState,
+    space::WrapperSpace,
 };
 use sctk::{
     delegate_keyboard,
     seat::keyboard::{KeyboardHandler, Keysym, RepeatInfo},
     shell::WaylandSurface,
 };
-use smithay::{
-    backend::input::KeyState,
-    input::keyboard::{
-        xkb::{Keymap, KeymapFormat},
-        FilterResult,
-    },
-    utils::SERIAL_COUNTER,
-};
+use smithay::{backend::input::KeyState, input::keyboard::FilterResult, utils::SERIAL_COUNTER};
 
 impl KeyboardHandler for GlobalState {
     fn enter(

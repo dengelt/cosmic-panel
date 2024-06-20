@@ -7,10 +7,7 @@ use sctk::{
 };
 use smithay::reexports::wayland_server::protocol::wl_output::Transform;
 
-use crate::{
-    space_container::SpaceContainer,
-    xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace},
-};
+use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 
 impl CompositorHandler for GlobalState {
     fn scale_factor_changed(

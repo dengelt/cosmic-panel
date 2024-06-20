@@ -12,4 +12,3 @@ pub use popup::*;
 pub use space::*;
 pub use toplevel::*;
 pub use workspace::*;
-pub use wrapper_space_element::*;

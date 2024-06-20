@@ -10,7 +10,6 @@ use crate::xdg_shell_wrapper::{
     client_state::ClientSeat,
     server_state::{SeatPair, ServerSeat},
     shared_state::GlobalState,
-    space::WrapperSpace,
 };
 
 impl SeatHandler for GlobalState {

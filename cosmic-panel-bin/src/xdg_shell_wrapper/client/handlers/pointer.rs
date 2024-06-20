@@ -374,7 +374,7 @@ impl GlobalState {
                             af = af.value(Axis::Horizontal, horizontal.absolute * 120.);
                         }
                         if horizontal.stop {
-                            af.stop(Axis::Horizontal);
+                            af = af.stop(Axis::Horizontal);
                         }
                     }
 
@@ -386,7 +386,7 @@ impl GlobalState {
                             af = af.value(Axis::Vertical, vertical.absolute * 120.);
                         }
                         if vertical.stop {
-                            af.stop(Axis::Vertical);
+                            af = af.stop(Axis::Vertical);
                         }
                     }
 

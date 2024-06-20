@@ -16,7 +16,7 @@ use smithay::{
 
 use client::state::ClientState;
 pub use client::{
-    handlers::{output, wp_fractional_scaling, wp_security_context, wp_viewporter},
+    handlers::{wp_fractional_scaling, wp_security_context, wp_viewporter},
     state as client_state,
 };
 pub use server::state as server_state;

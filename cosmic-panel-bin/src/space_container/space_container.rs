@@ -25,7 +25,7 @@ use cosmic_panel_config::{
 use cosmic_theme::{Theme, ThemeMode};
 use notify::RecommendedWatcher;
 use sctk::{
-    output::{self, OutputInfo},
+    output::OutputInfo,
     reexports::{
         calloop,
         client::{protocol::wl_output::WlOutput, Connection, QueueHandle},
@@ -492,7 +492,7 @@ impl SpaceContainer {
         spaces
     }
 
-    pub fn toggle_overflow_popup(&mut self, id: id::Id) {
+    pub fn toggle_overflow_popup(&mut self, _id: id::Id) {
         // TODO implement
     }
 }

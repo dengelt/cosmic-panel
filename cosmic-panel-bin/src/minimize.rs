@@ -5,8 +5,6 @@ use cctk::{
 };
 use smithay::utils::{Logical, Rectangle};
 
-use crate::space_container::SpaceContainer;
-
 #[derive(Debug, Clone)]
 pub struct MinimizeApplet {
     pub priority: i32,

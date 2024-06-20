@@ -1,10 +1,7 @@
 use sctk::data_device_manager::data_offer::DataOfferHandler;
 use sctk::reexports::client::protocol::wl_data_device_manager::DndAction;
 
-use crate::{
-    space_container::SpaceContainer,
-    xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace},
-};
+use crate::xdg_shell_wrapper::shared_state::GlobalState;
 
 impl DataOfferHandler for GlobalState {
     // TODO DnD

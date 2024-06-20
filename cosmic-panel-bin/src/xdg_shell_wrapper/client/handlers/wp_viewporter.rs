@@ -1,7 +1,5 @@
 //! Handling of the wp-viewporter.
 
-use std::marker::PhantomData;
-
 use sctk::reexports::client::globals::{BindError, GlobalList};
 use sctk::reexports::client::protocol::wl_surface::WlSurface;
 use sctk::reexports::client::Dispatch;
@@ -11,8 +9,7 @@ use sctk::reexports::protocols::wp::viewporter::client::wp_viewporter::WpViewpor
 
 use sctk::globals::GlobalData;
 
-use crate::space_container::SpaceContainer;
-use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
+use crate::xdg_shell_wrapper::shared_state::GlobalState;
 
 /// Viewporter.
 #[derive(Debug, Clone)]

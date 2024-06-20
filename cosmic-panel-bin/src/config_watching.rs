@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::space_container::SpaceContainer;
 use crate::xdg_shell_wrapper::shared_state::GlobalState;
 use anyhow::anyhow;
 use cosmic::{

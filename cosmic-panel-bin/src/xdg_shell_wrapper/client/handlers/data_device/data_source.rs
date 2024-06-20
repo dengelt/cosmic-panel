@@ -1,6 +1,5 @@
-use std::os::fd::{AsFd, IntoRawFd};
+use std::os::fd::AsFd;
 
-use crate::space_container::SpaceContainer;
 use crate::xdg_shell_wrapper::client_state::FocusStatus;
 use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 use sctk::data_device_manager::data_source::DataSourceHandler;

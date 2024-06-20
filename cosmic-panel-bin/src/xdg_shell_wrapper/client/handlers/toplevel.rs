@@ -9,8 +9,8 @@ use cctk::{
 };
 use wayland_client::{Connection, QueueHandle};
 
+use crate::xdg_shell_wrapper::shared_state::GlobalState;
 use crate::xdg_shell_wrapper::space::{ToplevelInfoSpace, ToplevelManagerSpace};
-use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
 
 impl ToplevelManagerHandler for GlobalState {
     fn toplevel_manager_state(&mut self) -> &mut cctk::toplevel_management::ToplevelManagerState {

@@ -32,10 +32,7 @@ impl ClientEglSurface {
     /// Create a Client Egl Surface
     /// must be dropped before the associated WlSurface is destroyed
     pub unsafe fn new(wl_egl_surface: wayland_egl::WlEglSurface, _wl_surface: WlSurface) -> Self {
-        Self {
-            wl_egl_surface,
-            _wl_surface,
-        }
+        Self { wl_egl_surface, _wl_surface }
     }
 }
 
@@ -46,11 +43,8 @@ pub struct ClientEglDisplay {
     pub display: WlDisplay,
 }
 
-static SURFACE_ATTRIBUTES: [c_int; 3] = [
-    ffi::egl::RENDER_BUFFER as c_int,
-    ffi::egl::BACK_BUFFER as c_int,
-    ffi::egl::NONE as c_int,
-];
+static SURFACE_ATTRIBUTES: [c_int; 3] =
+    [ffi::egl::RENDER_BUFFER as c_int, ffi::egl::BACK_BUFFER as c_int, ffi::egl::NONE as c_int];
 
 impl EGLNativeDisplay for ClientEglDisplay {
     fn supported_platforms(&self) -> Vec<EGLPlatform<'_>> {

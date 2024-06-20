@@ -1,9 +1,7 @@
 use crate::{
     space_container::SpaceContainer,
     xdg_shell_wrapper::{
-        server_state::ServerState,
-        shared_state::GlobalState,
-        space::{ToplevelInfoSpace, ToplevelManagerSpace, WorkspaceHandlerSpace, WrapperSpace},
+        server_state::ServerState, shared_state::GlobalState, space::WrapperSpace,
     },
 };
 use cctk::workspace::WorkspaceState;

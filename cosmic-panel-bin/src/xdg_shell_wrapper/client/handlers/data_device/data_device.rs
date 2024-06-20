@@ -23,11 +23,8 @@ use smithay::{
     },
 };
 
-use crate::{
-    space_container::SpaceContainer,
-    xdg_shell_wrapper::{
-        client_state::FocusStatus, shared_state::GlobalState, space::WrapperSpace,
-    },
+use crate::xdg_shell_wrapper::{
+    client_state::FocusStatus, shared_state::GlobalState, space::WrapperSpace,
 };
 
 impl DataDeviceHandler for GlobalState {

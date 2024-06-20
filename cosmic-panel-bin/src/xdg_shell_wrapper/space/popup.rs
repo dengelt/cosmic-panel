@@ -72,21 +72,11 @@ impl WrapperPopup {
     /// Handles any events that have occurred since the last call, redrawing if needed.
     /// Returns true if the surface is alive.
     pub fn handle_events(&mut self, popup_manager: &mut PopupManager) -> bool {
-        if let Some(WrapperPopupState::Rectangle {
-            width,
-            height,
-            x,
-            y,
-        }) = self.state
-        {
+        if let Some(WrapperPopupState::Rectangle { width, height, x, y }) = self.state {
             self.dirty = true;
             self.rectangle = Rectangle::from_loc_and_size((x, y), (width, height));
-            let scaled_size: Size<i32, _> = self
-                .rectangle
-                .size
-                .to_f64()
-                .to_physical(self.scale)
-                .to_i32_round();
+            let scaled_size: Size<i32, _> =
+                self.rectangle.size.to_f64().to_physical(self.scale).to_i32_round();
             if let Some(s) = self.egl_surface.as_ref() {
                 s.resize(scaled_size.w.max(1), scaled_size.h.max(1), 0, 0);
             }

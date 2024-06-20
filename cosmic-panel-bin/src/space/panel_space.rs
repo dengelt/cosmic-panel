@@ -18,7 +18,7 @@ use crate::xdg_shell_wrapper::{
     wp_security_context::SecurityContextManager,
 };
 use cctk::wayland_client::Connection;
-use cosmic::theme;
+
 use launch_pad::process::Process;
 use sctk::{
     compositor::Region,
@@ -74,9 +74,7 @@ use wayland_protocols::{
 
 use cosmic_panel_config::{CosmicPanelBackground, CosmicPanelConfig, PanelAnchor};
 
-use crate::{
-    iced::elements::CosmicMappedInternal, space_container::SpaceContainer, PanelCalloopMsg,
-};
+use crate::{iced::elements::CosmicMappedInternal, PanelCalloopMsg};
 
 use super::corner_element::{init_shaders, RoundedRectangleSettings};
 

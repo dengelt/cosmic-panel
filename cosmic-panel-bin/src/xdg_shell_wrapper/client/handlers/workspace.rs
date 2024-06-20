@@ -1,9 +1,6 @@
 use cctk::workspace::WorkspaceHandler;
 
-use crate::xdg_shell_wrapper::{
-    shared_state::GlobalState,
-    space::{WorkspaceHandlerSpace, WrapperSpace},
-};
+use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WorkspaceHandlerSpace};
 
 impl WorkspaceHandler for GlobalState {
     fn workspace_state(&mut self) -> &mut cctk::workspace::WorkspaceState {

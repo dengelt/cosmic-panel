@@ -1,12 +1,11 @@
 use std::{
-    borrow::Borrow,
-    slice::{Iter, IterMut},
+    slice::IterMut,
     sync::{atomic::AtomicBool, Arc, MutexGuard},
 };
 
 use crate::{
     iced::elements::{
-        overflow_button::{self, overflow_button_element, OverflowButton, OverflowButtonElement},
+        overflow_button::{self, overflow_button_element, OverflowButtonElement},
         CosmicMappedInternal,
     },
     minimize::MinimizeApplet,
@@ -14,6 +13,7 @@ use crate::{
 };
 
 use super::{panel_space::PanelClient, PanelSpace};
+use crate::xdg_shell_wrapper::space::WrapperSpace;
 use anyhow::bail;
 use cosmic::iced::id;
 use cosmic_panel_config::PanelAnchor;
@@ -23,9 +23,8 @@ use sctk::shell::WaylandSurface;
 use smithay::{
     desktop::{space::SpaceElement, Space, Window},
     reexports::wayland_server::Resource,
-    utils::{IsAlive, Logical, Physical, Rectangle, Size},
+    utils::{IsAlive, Physical, Rectangle, Size},
 };
-use crate::xdg_shell_wrapper::space::WrapperSpace;
 
 static LEFT_BTN: Lazy<id::Id> = Lazy::new(|| id::Id::new("LEFT_OVERFLOW_BTN"));
 static CENTER_BTN: Lazy<id::Id> = Lazy::new(|| id::Id::new("CENTER_OVERFLOW_BTN"));

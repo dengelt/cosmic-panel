@@ -18,10 +18,7 @@ use cosmic::{
     widget::{layer_container, Id},
     Element,
 };
-use smithay::{
-    desktop::space::SpaceElement,
-    utils::{IsAlive, Logical, Point, Rectangle, Size},
-};
+use smithay::utils::{Logical, Point, Size};
 
 use crate::iced::{IcedElement, Program};
 

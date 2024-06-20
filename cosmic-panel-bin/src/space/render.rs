@@ -8,7 +8,7 @@ use super::{
 };
 use cctk::wayland_client::{Proxy, QueueHandle};
 
-use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
+use crate::xdg_shell_wrapper::shared_state::GlobalState;
 use sctk::shell::WaylandSurface;
 use smithay::{
     backend::renderer::{
@@ -52,7 +52,7 @@ impl smithay::backend::renderer::element::Element for PanelRenderElement {
 
     fn src(&self) -> Rectangle<f64, Buffer> {
         match self {
-            Self::Wayland(e, src, ..) => *src,
+            Self::Wayland(_e, src, ..) => *src,
             Self::RoundedRectangle(e) => e.src(),
             Self::Iced(e) => e.src(),
         }
@@ -60,7 +60,7 @@ impl smithay::backend::renderer::element::Element for PanelRenderElement {
 
     fn geometry(&self, scale: smithay::utils::Scale<f64>) -> Rectangle<i32, Physical> {
         match self {
-            Self::Wayland(e, _, geo) => *geo,
+            Self::Wayland(_e, _, geo) => *geo,
             Self::RoundedRectangle(e) => e.geometry(scale),
             Self::Iced(e) => e.geometry(scale),
         }

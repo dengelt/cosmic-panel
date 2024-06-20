@@ -7,7 +7,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::space_container::SpaceContainer;
 use crate::xdg_shell_wrapper::shared_state::GlobalState;
 use cosmic::{
     iced::{

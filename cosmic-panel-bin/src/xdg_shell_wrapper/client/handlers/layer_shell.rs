@@ -8,11 +8,8 @@ use sctk::{
     },
 };
 
-use crate::{
-    space_container::SpaceContainer,
-    xdg_shell_wrapper::{
-        client_state::SurfaceState, shared_state::GlobalState, space::WrapperSpace,
-    },
+use crate::xdg_shell_wrapper::{
+    client_state::SurfaceState, shared_state::GlobalState, space::WrapperSpace,
 };
 
 impl LayerShellHandler for GlobalState {

@@ -3,7 +3,7 @@ use smithay::{
     wayland::shell::wlr_layer::{Layer, WlrLayerShellHandler},
 };
 
-use crate::xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace};
+use crate::xdg_shell_wrapper::shared_state::GlobalState;
 
 delegate_layer_shell!(GlobalState);
 impl WlrLayerShellHandler for GlobalState {

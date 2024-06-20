@@ -9,10 +9,7 @@ use sctk::{
     shm::{Shm, ShmHandler},
 };
 
-use crate::{
-    space_container::SpaceContainer,
-    xdg_shell_wrapper::{shared_state::GlobalState, space::WrapperSpace},
-};
+use crate::xdg_shell_wrapper::shared_state::GlobalState;
 
 pub mod compositor;
 pub mod data_device;
