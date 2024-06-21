@@ -54,7 +54,7 @@ use smithay::{
         wayland_protocols::xdg::shell::client::xdg_positioner::{Anchor, Gravity},
         wayland_server::{backend::ClientId, Client, DisplayHandle},
     },
-    utils::{Logical, Rectangle, Size},
+    utils::{Logical, Rectangle, Serial, Size, SERIAL_COUNTER},
     wayland::{
         seat::WaylandFocus,
         shell::xdg::{PopupSurface, PositionerState},

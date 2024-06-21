@@ -64,6 +64,7 @@ use smithay::{
 };
 
 pub mod elements;
+pub mod panel_message;
 
 pub type Element<'a, Message> = cosmic::iced::Element<'a, Message, cosmic::Theme, cosmic::Renderer>;
 
@@ -148,6 +149,7 @@ struct IcedElementInternal<P: Program + Send + 'static> {
     // state
     size: Size<i32, Logical>,
     cursor_pos: Option<Point<f64, Logical>>,
+    panel_id: usize,
 
     // iced
     theme: Theme,
@@ -197,6 +199,7 @@ impl<P: Program + Send + Clone + 'static> Clone for IcedElementInternal<P> {
             size: self.size.clone(),
             cursor_pos: self.cursor_pos.clone(),
             theme: self.theme.clone(),
+            panel_id: self.panel_id,
             renderer,
             state,
             debug,
@@ -239,6 +242,7 @@ impl<P: Program + Send + 'static> IcedElement<P> {
         size: impl Into<Size<i32, Logical>>,
         handle: LoopHandle<'static, GlobalState>,
         theme: cosmic::Theme,
+        panel_id: usize,
     ) -> IcedElement<P> {
         let size = size.into();
         let mut renderer = IcedRenderer::TinySkia(IcedGraphicsRenderer::new(
@@ -278,6 +282,7 @@ impl<P: Program + Send + 'static> IcedElement<P> {
             scheduler,
             executor_token,
             rx,
+            panel_id,
         };
         let _ = internal.update(true);
 
@@ -375,7 +380,6 @@ impl<P: Program + Send + 'static> IcedElementInternal<P> {
             .map(|p| IcedPoint::new(p.x as f32, p.y as f32))
             .map(Cursor::Available)
             .unwrap_or(Cursor::Unavailable);
-
         let actions = self
             .state
             .update(
@@ -393,6 +397,11 @@ impl<P: Program + Send + 'static> IcedElementInternal<P> {
                 &mut self.debug,
             )
             .1;
+
+        let panel_id = self.panel_id;
+        self.handle.insert_idle(move |state| {
+            let _ = state.space.iced_request_redraw(panel_id);
+        });
 
         actions
             .into_iter()
@@ -420,9 +429,16 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState> for IcedElement<P> 
 
     fn motion(&self, _seat: &Seat<GlobalState>, _data: &mut GlobalState, event: &MotionEvent) {
         let mut internal = self.0.lock().unwrap();
-        let position = IcedPoint::new(event.location.x as f32, event.location.y as f32);
-        internal.state.queue_event(Event::Mouse(MouseEvent::CursorMoved { position }));
-        internal.cursor_pos = Some(event.location);
+        let bbox = Rectangle::from_loc_and_size((0, 0), internal.size);
+
+        if bbox.contains(event.location.to_i32_round()) {
+            internal.cursor_pos = Some(event.location);
+            let position = IcedPoint::new(event.location.x as f32, event.location.y as f32);
+            internal.state.queue_event(Event::Mouse(MouseEvent::CursorMoved { position }));
+        } else {
+            internal.cursor_pos = None;
+            internal.state.queue_event(Event::Mouse(MouseEvent::CursorLeft));
+        }
         let _ = internal.update(true);
     }
 
@@ -471,6 +487,7 @@ impl<P: Program + Send + 'static> PointerTarget<GlobalState> for IcedElement<P> 
         _time: u32,
     ) {
         let mut internal = self.0.lock().unwrap();
+        internal.cursor_pos = None;
         internal.state.queue_event(Event::Mouse(MouseEvent::CursorLeft));
         let _ = internal.update(true);
     }
@@ -711,7 +728,7 @@ where
         } else {
             false
         };
-        let _ = internal_ref.update(force);
+        let _ = internal_ref.update(true);
         if let Some((buffer, ref mut old_primitives)) =
             internal_ref.buffers.get_mut(&OrderedFloat(scale.x))
         {

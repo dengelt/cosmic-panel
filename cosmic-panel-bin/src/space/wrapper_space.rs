@@ -815,7 +815,7 @@ impl WrapperSpace for PanelSpace {
             }
             // FIXME
             // There has to be a way to avoid messing with the scaling like this...
-            if let Some((w, relative_loc)) = self.space.elements().rev().find_map(|e| {
+            if let Some((target, relative_loc)) = self.space.elements().rev().find_map(|e| {
                 let Some(render_location) = self.space.element_location(e) else {
                     self.generated_ptr_event_count =
                         self.generated_ptr_event_count.saturating_sub(1);
@@ -832,17 +832,12 @@ impl WrapperSpace for PanelSpace {
                     None
                 }
             }) {
-                let geo = w.bbox().to_f64().to_physical(1.0).to_logical(self.scale).to_i32_round();
-                if let CosmicMappedInternal::Window(ref w) = w {
-                    if let Some(prev_kbd) = prev_foc {
-                        prev_kbd.0 =
-                            w.toplevel().expect("Missing toplevel").wl_surface().clone().into();
-                    } else {
-                        self.s_focused_surface.push((
-                            w.toplevel().expect("Missing toplevel").wl_surface().clone().into(),
-                            seat_name.to_string(),
-                        ));
-                    }
+                let geo =
+                    target.bbox().to_f64().to_physical(1.0).to_logical(self.scale).to_i32_round();
+                if let Some(prev_kbd) = prev_foc {
+                    prev_kbd.0 = target.clone().into();
+                } else {
+                    self.s_focused_surface.push((target.clone().into(), seat_name.to_string()));
                 }
 
                 let prev_popup_client = self
@@ -853,7 +848,7 @@ impl WrapperSpace for PanelSpace {
                     .map(|c| c.id());
 
                 let cur_client_hover_id =
-                    w.toplevel().and_then(|t| t.wl_surface().client().map(|c| c.id()));
+                    target.wl_surface().and_then(|t| t.client().map(|c| c.id()));
                 if prev_popup_client.is_some()
                     && prev_popup_client != cur_client_hover_id
                     && self.generated_ptr_event_count == 0
@@ -957,23 +952,19 @@ impl WrapperSpace for PanelSpace {
                 } else if prev_popup_client.is_some() && self.generated_ptr_event_count == 0 {
                     // TODO simulate button press on the overflow button...
                 }
-                if let CosmicMappedInternal::Window(w) = w {
-                    if let Some((_, prev_foc)) = prev_hover.as_mut() {
-                        prev_foc.s_pos = relative_loc.to_f64();
-                        prev_foc.c_pos = geo.loc;
-                        prev_foc.surface = w.wl_surface().map(|w| w.into_owned().into()).unwrap();
-                        Some(prev_foc.clone())
-                    } else {
-                        self.s_hovered_surface.push(ServerPointerFocus {
-                            surface: w.wl_surface().map(|w| w.into_owned().into()).unwrap(),
-                            seat_name: seat_name.to_string(),
-                            c_pos: geo.loc,
-                            s_pos: relative_loc.to_f64(),
-                        });
-                        self.s_hovered_surface.last().cloned()
-                    }
+                if let Some((_, prev_foc)) = prev_hover.as_mut() {
+                    prev_foc.s_pos = relative_loc.to_f64();
+                    prev_foc.c_pos = geo.loc;
+                    prev_foc.surface = target.into();
+                    Some(prev_foc.clone())
                 } else {
-                    None
+                    self.s_hovered_surface.push(ServerPointerFocus {
+                        surface: target.into(),
+                        seat_name: seat_name.to_string(),
+                        c_pos: geo.loc,
+                        s_pos: relative_loc.to_f64(),
+                    });
+                    self.s_hovered_surface.last().cloned()
                 }
             } else {
                 if let Some((prev_i, _)) = prev_hover {

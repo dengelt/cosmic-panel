@@ -396,8 +396,6 @@ impl PanelSpace {
             // check if it can be expanded
             self.relax_overflow_center(center_overflow.abs() as u32)
         } else if center_overflow > 0 {
-            dbg!(center_sum, target_center_len);
-
             let overflow = self.shrink_center((center_sum - target_center_len) as u32);
             bail!("overflow: {}", overflow)
         }
@@ -706,7 +704,6 @@ impl PanelSpace {
         let mut i = 0;
         let shrinkable = &mut clients.shrinkable;
         let unit_size = self.config.size.get_applet_icon_size_with_padding(true);
-        // dbg!(overflow, shrinkable.len(), clients.movable.len());
         while overflow > 0 && i < shrinkable.len() {
             let (w, _, min_units) = &mut shrinkable[i];
             let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
@@ -817,6 +814,7 @@ impl PanelSpace {
                     icon.into(),
                     self.loop_handle.clone(),
                     self.colors.theme.clone(),
+                    self.space.id(),
                 )),
                 overflow_button_loc,
                 false,

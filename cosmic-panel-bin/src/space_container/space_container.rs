@@ -36,10 +36,8 @@ use sctk::{
 use smithay::{
     backend::renderer::gles::GlesRenderer,
     output::Output,
-    reexports::wayland_server::{
-        backend::ClientId,
-        {self},
-    },
+    reexports::wayland_server::{self, backend::ClientId},
+    utils::Serial,
 };
 use tokio::sync::mpsc;
 use tracing::{error, info};
@@ -493,7 +491,21 @@ impl SpaceContainer {
         spaces
     }
 
-    pub fn toggle_overflow_popup(&mut self, _id: id::Id) {
-        // TODO implement
+    pub fn toggle_overflow_popup(&mut self, panel_id: usize, _element_id: id::Id) {
+        for space in &mut self.space_list {
+            if space.space.id() == panel_id {
+                // space.toggle_overflow_popup(element_id);
+                break;
+            }
+        }
+    }
+
+    pub fn iced_request_redraw(&mut self, panel_id: usize) {
+        for space in &mut self.space_list {
+            if space.space.id() == panel_id {
+                space.is_dirty = true;
+                break;
+            }
+        }
     }
 }
