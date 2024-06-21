@@ -7,6 +7,7 @@ use smithay::{
     backend::{egl::EGLSurface, renderer::gles::GlesRenderer},
     desktop::{PopupKind, PopupManager},
     utils::Rectangle,
+    wayland::seat::WaylandFocus,
 };
 use wayland_egl::WlEglSurface;
 
@@ -18,7 +19,9 @@ impl PanelSpace {
             for (p, _) in PopupManager::popups_for_surface(t.wl_surface()) {
                 match p {
                     PopupKind::Xdg(p) => {
-                        if !self.s_hovered_surface.iter().any(|hs| &hs.surface == t.wl_surface()) {
+                        if !self.s_hovered_surface.iter().any(|hs| {
+                            hs.surface.wl_surface().is_some_and(|s| s.as_ref() == t.wl_surface())
+                        }) {
                             p.send_popup_done();
                         }
                     },

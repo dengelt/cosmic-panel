@@ -9,6 +9,7 @@ use std::{
 };
 
 use crate::{
+    iced::elements::target::SpaceTarget,
     space_container::SpaceContainer,
     xdg_shell_wrapper::{
         client_state::ClientFocus,
@@ -726,7 +727,7 @@ impl WrapperSpace for PanelSpace {
     }
 
     /// returns false to forward the button press, and true to intercept
-    fn handle_button(&mut self, seat_name: &str, press: bool) -> Option<s_WlSurface> {
+    fn handle_button(&mut self, seat_name: &str, press: bool) -> Option<SpaceTarget> {
         self.generated_ptr_event_count = self.generated_ptr_event_count.saturating_sub(1);
 
         if let Some(prev_foc) = {
@@ -747,7 +748,7 @@ impl WrapperSpace for PanelSpace {
             }
             self.s_hovered_surface.iter().find_map(|h| {
                 if h.seat_name.as_str() == seat_name {
-                    Some(h.surface.clone())
+                    Some(h.surface.clone().into())
                 } else {
                     None
                 }
@@ -778,20 +779,20 @@ impl WrapperSpace for PanelSpace {
             // special handling for popup bc they exist on their own client surface
 
             if let Some(prev_foc) = prev_foc {
-                prev_foc.0 = p.s_surface.wl_surface().clone();
+                prev_foc.0 = p.s_surface.wl_surface().clone().into();
             } else {
                 self.s_focused_surface
-                    .push((p.s_surface.wl_surface().clone(), seat_name.to_string()));
+                    .push((p.s_surface.wl_surface().clone().into(), seat_name.to_string()));
             }
             if let Some((_, prev_foc)) = prev_hover.as_mut() {
                 prev_foc.c_pos = p.rectangle.loc;
                 prev_foc.s_pos = (p.rectangle.loc - geo.loc).to_f64();
 
-                prev_foc.surface = p.s_surface.wl_surface().clone();
+                prev_foc.surface = p.s_surface.wl_surface().clone().into();
                 Some(prev_foc.clone())
             } else {
                 self.s_hovered_surface.push(ServerPointerFocus {
-                    surface: p.s_surface.wl_surface().clone(),
+                    surface: p.s_surface.wl_surface().clone().into(),
                     seat_name: seat_name.to_string(),
                     c_pos: p.rectangle.loc,
                     s_pos: (p.rectangle.loc - geo.loc).to_f64(),
@@ -803,8 +804,8 @@ impl WrapperSpace for PanelSpace {
             if self.layer.as_ref().map(|s| *s.wl_surface() != c_wl_surface).unwrap_or(true) {
                 if self.space.elements().any(|e| {
                     e.wl_surface()
-                        .zip(prev_hover.as_ref())
-                        .is_some_and(|(s, prev_hover)| s.as_ref() == &prev_hover.1.surface)
+                        .zip(prev_hover.as_ref().map(|s| s.1.surface.wl_surface()))
+                        .is_some_and(|(s, prev_hover)| Some(s) == prev_hover)
                 }) {
                     let (pos, _) = prev_hover.unwrap();
                     self.s_hovered_surface.remove(pos);
@@ -834,10 +835,11 @@ impl WrapperSpace for PanelSpace {
                 let geo = w.bbox().to_f64().to_physical(1.0).to_logical(self.scale).to_i32_round();
                 if let CosmicMappedInternal::Window(ref w) = w {
                     if let Some(prev_kbd) = prev_foc {
-                        prev_kbd.0 = w.toplevel().expect("Missing toplevel").wl_surface().clone();
+                        prev_kbd.0 =
+                            w.toplevel().expect("Missing toplevel").wl_surface().clone().into();
                     } else {
                         self.s_focused_surface.push((
-                            w.toplevel().expect("Missing toplevel").wl_surface().clone(),
+                            w.toplevel().expect("Missing toplevel").wl_surface().clone().into(),
                             seat_name.to_string(),
                         ));
                     }
@@ -959,11 +961,11 @@ impl WrapperSpace for PanelSpace {
                     if let Some((_, prev_foc)) = prev_hover.as_mut() {
                         prev_foc.s_pos = relative_loc.to_f64();
                         prev_foc.c_pos = geo.loc;
-                        prev_foc.surface = w.wl_surface().map(|w| w.into_owned()).unwrap();
+                        prev_foc.surface = w.wl_surface().map(|w| w.into_owned().into()).unwrap();
                         Some(prev_foc.clone())
                     } else {
                         self.s_hovered_surface.push(ServerPointerFocus {
-                            surface: w.wl_surface().map(|w| w.into_owned()).unwrap(),
+                            surface: w.wl_surface().map(|w| w.into_owned().into()).unwrap(),
                             seat_name: seat_name.to_string(),
                             c_pos: geo.loc,
                             s_pos: relative_loc.to_f64(),

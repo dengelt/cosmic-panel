@@ -1,13 +1,16 @@
 use std::{cell::RefCell, rc::Rc, time::Instant};
 
-use crate::xdg_shell_wrapper::{
-    client_state::{ClientFocus, FocusStatus},
-    server_state::ServerPointerFocus,
-    shared_state::GlobalState,
-    space::{Visibility, WrapperSpace},
-    wp_fractional_scaling::FractionalScalingManager,
-    wp_security_context::SecurityContextManager,
-    wp_viewporter::ViewporterState,
+use crate::{
+    iced::elements::target::SpaceTarget,
+    xdg_shell_wrapper::{
+        client_state::{ClientFocus, FocusStatus},
+        server_state::ServerPointerFocus,
+        shared_state::GlobalState,
+        space::{Visibility, WrapperSpace},
+        wp_fractional_scaling::FractionalScalingManager,
+        wp_security_context::SecurityContextManager,
+        wp_viewporter::ViewporterState,
+    },
 };
 use cosmic_panel_config::{CosmicPanelBackground, CosmicPanelContainerConfig, CosmicPanelOuput};
 use itertools::Itertools;
@@ -561,7 +564,7 @@ impl WrapperSpace for SpaceContainer {
         ret
     }
 
-    fn handle_button(&mut self, seat_name: &str, press: bool) -> Option<wl_surface::WlSurface> {
+    fn handle_button(&mut self, seat_name: &str, press: bool) -> Option<SpaceTarget> {
         if let Some((popup_space_i, popup_space)) =
             self.space_list.iter_mut().enumerate().find(|(_, s)| !s.popups.is_empty())
         {
