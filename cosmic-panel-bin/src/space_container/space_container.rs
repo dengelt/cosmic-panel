@@ -508,4 +508,10 @@ impl SpaceContainer {
             }
         }
     }
+
+    pub fn update_hidden_applet_frame(&mut self) {
+        for space in &mut self.space_list {
+            space.update_hidden_applet_frame();
+        }
+    }
 }

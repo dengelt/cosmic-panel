@@ -62,7 +62,7 @@ pub enum Message {
 
 #[derive(Debug, Clone)]
 pub struct OverflowButton {
-    id: id::Id,
+    pub id: id::Id,
     pos: Point<i32, Logical>,
     icon_size: u16,
     button_padding: Padding,
@@ -108,7 +108,6 @@ impl Program for OverflowButton {
         message: Self::Message,
         loop_handle: &calloop::LoopHandle<'static, xdg_shell_wrapper::shared_state::GlobalState>,
     ) -> cosmic::Command<Self::Message> {
-        dbg!(&message);
         match message {
             Message::TogglePopup => {
                 let id = self.id.clone();

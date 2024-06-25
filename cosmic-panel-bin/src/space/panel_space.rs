@@ -608,7 +608,6 @@ impl PanelSpace {
         additional_gap: i32,
         layer_surface: &LayerSurface,
     ) {
-        info!("Setting margin: {} {} {}", anchor, margin, target);
         match anchor {
             PanelAnchor::Left => {
                 layer_surface.set_margin(margin, 0, margin, target + additional_gap)

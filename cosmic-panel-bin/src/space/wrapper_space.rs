@@ -658,6 +658,18 @@ impl WrapperSpace for PanelSpace {
             w.on_commit();
             w.refresh();
         }
+
+        // check unmapped and overflow
+        if let Some(w) = self
+            .unmapped
+            .iter()
+            .chain(self.overflow_left.elements())
+            .chain(self.overflow_center.elements().chain(self.overflow_right.elements()))
+            .find(|w| w.wl_surface().is_some_and(|w| w.as_ref() == s))
+        {
+            w.on_commit();
+            w.refresh();
+        }
     }
 
     fn dirty_popup(&mut self, _dh: &DisplayHandle, s: &s_WlSurface) {
