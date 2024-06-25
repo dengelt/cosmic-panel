@@ -19,6 +19,7 @@ use crate::xdg_shell_wrapper::{
 };
 use cctk::wayland_client::Connection;
 
+use cosmic::iced::id;
 use launch_pad::process::Process;
 use sctk::{
     compositor::Region,
@@ -255,6 +256,12 @@ pub(crate) struct PanelSpace {
     pub scale_change_retries: u32,
     pub additional_gap: i32,
     pub loop_handle: calloop::LoopHandle<'static, GlobalState>,
+    pub left_overflow_button_id: id::Id,
+    pub center_overflow_button_id: id::Id,
+    pub right_overflow_button_id: id::Id,
+    pub left_overflow_popup_id: id::Id,
+    pub center_overflow_popup_id: id::Id,
+    pub right_overflow_popup_id: id::Id,
 }
 
 impl PanelSpace {
@@ -272,6 +279,7 @@ impl PanelSpace {
         visibility: Visibility,
         loop_handle: calloop::LoopHandle<'static, GlobalState>,
     ) -> Self {
+        let name = format!("{}-{}", config.name, config.output);
         Self {
             config,
             space: Space::default(),
@@ -323,6 +331,12 @@ impl PanelSpace {
             scale_change_retries: 0,
             additional_gap: 0,
             loop_handle,
+            left_overflow_button_id: id::Id::new(format!("{}-left-overflow-button", name)),
+            center_overflow_button_id: id::Id::new(format!("{}-center-overflow-button", name)),
+            right_overflow_button_id: id::Id::new(format!("{}-right-overflow-button", name)),
+            left_overflow_popup_id: id::Id::new(format!("{}-left-overflow-popup", name)),
+            center_overflow_popup_id: id::Id::new(format!("{}-center-overflow-popup", name)),
+            right_overflow_popup_id: id::Id::new(format!("{}-right-overflow-popup", name)),
         }
     }
 

@@ -27,10 +27,6 @@ use smithay::{
     utils::{IsAlive, Physical, Rectangle, Size},
 };
 
-static LEFT_BTN: Lazy<id::Id> = Lazy::new(|| id::Id::new("LEFT_OVERFLOW_BTN"));
-static CENTER_BTN: Lazy<id::Id> = Lazy::new(|| id::Id::new("CENTER_OVERFLOW_BTN"));
-static RIGHT_BTN: Lazy<id::Id> = Lazy::new(|| id::Id::new("RIGHT_OVERFLOW_BTN"));
-
 impl PanelSpace {
     pub(crate) fn layout_(&mut self) -> anyhow::Result<()> {
         let gap = self.gap();
@@ -57,7 +53,7 @@ impl PanelSpace {
                     CosmicMappedInternal::Window(w) => w,
                     CosmicMappedInternal::OverflowButton(b)
                         if overflow_button::with_id(&b, |id| {
-                            Lazy::get(&LEFT_BTN).is_some_and(|left_id| left_id == id)
+                            &self.left_overflow_button_id == id
                         }) =>
                     {
                         left_overflow_button = Some(b);
@@ -65,14 +61,14 @@ impl PanelSpace {
                     },
                     CosmicMappedInternal::OverflowButton(b)
                         if overflow_button::with_id(&b, |id| {
-                            Lazy::get(&CENTER_BTN).is_some_and(|center_id| center_id == id)
+                            &self.center_overflow_button_id == id
                         }) =>
                     {
                         return None;
                     },
                     CosmicMappedInternal::OverflowButton(b)
                         if overflow_button::with_id(&b, |id| {
-                            Lazy::get(&RIGHT_BTN).is_some_and(|right_id| right_id == id)
+                            &self.right_overflow_button_id == id
                         }) =>
                     {
                         right_overflow_button = Some(b);
@@ -375,20 +371,40 @@ impl PanelSpace {
         let one_half = layer_major as f64 / (2.min(num_lists) as f64);
         let larger_side = left_sum.max(right_sum);
 
-        let target_center_len = (layer_major as f64 - spacing_u32 as f64 * 2. - larger_side * (2.))
-            .max(one_third)
-            .min(layer_major as f64);
-        let target_left_len = if windows_center.is_empty() {
-            (layer_major as f64 - right_sum.min(one_half) - spacing_u32 as f64).max(one_half)
+        let mut target_center_len =
+            (layer_major as f64 - larger_side * (2.)).max(one_third).min(layer_major as f64);
+        if num_lists == 1 {
+            target_center_len -= padding_u32 as f64 * 2.;
         } else {
-            (one_half - target_center_len.min(center_sum) / 2.).max(one_third)
+            target_center_len -= spacing_u32 as f64;
+        }
+        let target_left_len = if windows_center.is_empty() {
+            (layer_major as f64
+                - right_sum.min(one_half)
+                - (spacing_u32 as f64) / 2.
+                - padding_u32 as f64)
+                .max(one_half)
+        } else {
+            (one_half
+                - target_center_len.min(center_sum) / 2.
+                - (spacing_u32 as f64) / 2.
+                - padding_u32 as f64)
+                .max(one_third)
         }
         .min(layer_major as f64);
 
         let target_right_len = if windows_center.is_empty() {
-            (layer_major as f64 - left_sum.min(one_half) - spacing_u32 as f64).max(one_half)
+            (layer_major as f64
+                - left_sum.min(one_half)
+                - (spacing_u32 as f64) / 2.
+                - padding_u32 as f64)
+                .max(one_half)
         } else {
-            (one_half - target_center_len.min(center_sum) / 2.).max(one_third)
+            (one_half
+                - target_center_len.min(center_sum) / 2.
+                - (spacing_u32 as f64) / 2.
+                - padding_u32 as f64)
+                .max(one_third)
         }
         .min(layer_major as f64);
 
@@ -749,7 +765,6 @@ impl PanelSpace {
         clients: OverflowClientPartition,
         section: OverflowSection,
     ) -> u32 {
-        let overflow_0 = overflow;
         let overflow_space = match section {
             OverflowSection::Left => &mut self.overflow_left,
             OverflowSection::Center => &mut self.overflow_center,
@@ -785,18 +800,16 @@ impl PanelSpace {
             }
             overflow_space.map_element(w.0, (x, y), true);
         }
+        overflow_space.refresh();
 
-        if !had_overflow_prev && overflow != overflow_0 {
-            // TODO use a borrowed bool for selected
+        if !had_overflow_prev && overflow_space.elements().count() > 0 {
             // XXX the location will be adjusted later so this is ok
             let overflow_button_loc = (0, 0);
             let id = match section {
-                OverflowSection::Left => Lazy::force(&LEFT_BTN).clone(),
-                OverflowSection::Center => Lazy::force(&CENTER_BTN).clone(),
-                OverflowSection::Right => Lazy::force(&RIGHT_BTN).clone(),
+                OverflowSection::Left => self.left_overflow_button_id.clone(),
+                OverflowSection::Center => self.center_overflow_button_id.clone(),
+                OverflowSection::Right => self.right_overflow_button_id.clone(),
             };
-            // if there was no overflow before, and there is now, then we need to add the
-            // overflow button
 
             let icon_size = self.config.size.get_applet_icon_size(true);
             let padding = self.config.size.get_applet_padding(true);
@@ -819,7 +832,9 @@ impl PanelSpace {
                 )),
                 overflow_button_loc,
                 false,
-            )
+            );
+            self.space.refresh();
+            self.clear();
         }
 
         overflow
@@ -879,14 +894,12 @@ impl PanelSpace {
                 suggested_size,
             );
             if self.overflow_left.elements().count() <= 0 && had_extra {
-                dbg!(had_extra, self.overflow_center.elements().count());
-
                 let button = self.space
                     .elements()
                     // find with left btn id
                     .find(|e| {
                         if let CosmicMappedInternal::OverflowButton(b) = e {
-                            b.with_program(|p| &p.id == Lazy::force(&LEFT_BTN))
+                            b.with_program(|p| p.id == self.left_overflow_button_id)
                         } else {
                             false
                         }
@@ -918,13 +931,12 @@ impl PanelSpace {
                 suggested_size,
             );
             if self.overflow_center.elements().count() <= 0 && had_extra {
-                dbg!(had_extra, self.overflow_center.elements().count());
                 let button = self.space
                     .elements()
                     // find with center btn id
                     .find(|e| {
                         if let CosmicMappedInternal::OverflowButton(b) = e {
-                            b.with_program(|p| &p.id == Lazy::force(&CENTER_BTN))
+                            b.with_program(|p| p.id == self.center_overflow_button_id)
                         } else {
                             false
                         }
@@ -960,7 +972,7 @@ impl PanelSpace {
                     // find with right btn id
                     .find(|e| {
                         if let CosmicMappedInternal::OverflowButton(b) = e {
-                            b.with_program(|p| &p.id == Lazy::force(&RIGHT_BTN))
+                            b.with_program(|p| p.id == self.right_overflow_button_id)
                         } else {
                             false
                         }
