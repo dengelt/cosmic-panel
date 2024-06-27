@@ -1079,6 +1079,13 @@ impl PanelSpace {
                 duration: Duration::from_millis(300),
             })
         }
+
+        for e in self.space.elements() {
+            let CosmicMappedInternal::OverflowButton(b) = e else {
+                continue;
+            };
+            b.set_theme(colors.theme.clone());
+        }
         self.colors = colors;
     }
 
