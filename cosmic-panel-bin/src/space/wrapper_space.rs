@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    iced::elements::target::SpaceTarget,
+    iced::elements::{target::SpaceTarget, PopupMappedInternal},
     space_container::SpaceContainer,
     xdg_shell_wrapper::{
         client_state::ClientFocus,
@@ -661,12 +661,24 @@ impl WrapperSpace for PanelSpace {
         }
 
         // check unmapped and overflow
+        if let Some(w) =
+            self.unmapped.iter().find(|w| w.wl_surface().is_some_and(|w| w.as_ref() == s))
+        {
+            w.on_commit();
+            w.refresh();
+        }
+
         if let Some(w) = self
-            .unmapped
-            .iter()
-            .chain(self.overflow_left.elements())
+            .overflow_left
+            .elements()
             .chain(self.overflow_center.elements().chain(self.overflow_right.elements()))
-            .find(|w| w.wl_surface().is_some_and(|w| w.as_ref() == s))
+            .find_map(|w| {
+                if let PopupMappedInternal::Window(w) = w {
+                    w.wl_surface().is_some_and(|w| w.as_ref() == s).then_some(w)
+                } else {
+                    None
+                }
+            })
         {
             w.on_commit();
             w.refresh();

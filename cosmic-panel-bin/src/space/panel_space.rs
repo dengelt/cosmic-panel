@@ -7,15 +7,18 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::xdg_shell_wrapper::{
-    client_state::{ClientFocus, FocusStatus},
-    server_state::{ServerFocus, ServerPtrFocus},
-    shared_state::GlobalState,
-    space::{
-        ClientEglDisplay, ClientEglSurface, SpaceEvent, Visibility, WrapperPopup, WrapperSpace,
+use crate::{
+    iced::elements::PopupMappedInternal,
+    xdg_shell_wrapper::{
+        client_state::{ClientFocus, FocusStatus},
+        server_state::{ServerFocus, ServerPtrFocus},
+        shared_state::GlobalState,
+        space::{
+            ClientEglDisplay, ClientEglSurface, SpaceEvent, Visibility, WrapperPopup, WrapperSpace,
+        },
+        util::smootherstep,
+        wp_security_context::SecurityContextManager,
     },
-    util::smootherstep,
-    wp_security_context::SecurityContextManager,
 };
 use cctk::wayland_client::Connection;
 
@@ -208,9 +211,9 @@ pub(crate) struct PanelSpace {
     pub(crate) clients_left: Clients,
     pub(crate) clients_center: Clients,
     pub(crate) clients_right: Clients,
-    pub(crate) overflow_left: Space<Window>,
-    pub(crate) overflow_center: Space<Window>,
-    pub(crate) overflow_right: Space<Window>,
+    pub(crate) overflow_left: Space<PopupMappedInternal>,
+    pub(crate) overflow_center: Space<PopupMappedInternal>,
+    pub(crate) overflow_right: Space<PopupMappedInternal>,
     pub(crate) last_dirty: Option<Instant>,
     // pending size of the panel
     pub(crate) pending_dimensions: Option<Size<i32, Logical>>,
@@ -1085,6 +1088,7 @@ impl PanelSpace {
                 continue;
             };
             b.set_theme(colors.theme.clone());
+            b.force_redraw();
         }
         self.colors = colors;
     }

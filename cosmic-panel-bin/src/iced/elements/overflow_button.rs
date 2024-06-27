@@ -1,5 +1,5 @@
 use std::{
-    borrow::Cow,
+    borrow::{BorrowMut, Cow},
     hash::Hash,
     rc::Rc,
     sync::{
@@ -8,7 +8,8 @@ use std::{
     },
 };
 
-use calloop::LoopHandle;
+use calloop::{Idle, LoopHandle};
+use once_cell::sync::OnceCell;
 // element for rendering a button that toggles the overflow popup when clicked
 use crate::xdg_shell_wrapper::{self, shared_state::GlobalState};
 use cosmic::{
@@ -48,6 +49,7 @@ pub fn overflow_button_element(
         handle,
         theme,
         panel_id,
+        true,
     )
 }
 
@@ -112,9 +114,14 @@ impl Program for OverflowButton {
             Message::TogglePopup => {
                 let id = self.id.clone();
                 let panel_id = self.panel_id;
-                loop_handle.insert_idle(move |state| {
-                    state.space.toggle_overflow_popup(panel_id, id);
-                });
+
+                _ = loop_handle.insert_source(
+                    calloop::timer::Timer::immediate(),
+                    move |_, _, state| {
+                        state.space.toggle_overflow_popup(panel_id, id.clone());
+                        calloop::timer::TimeoutAction::Drop
+                    },
+                );
             },
         }
         cosmic::Command::none()

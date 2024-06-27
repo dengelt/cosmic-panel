@@ -7,7 +7,8 @@ use std::{
 use crate::{
     iced::elements::{
         overflow_button::{self, overflow_button_element, OverflowButtonElement},
-        CosmicMappedInternal,
+        overflow_popup::overflow_popup_element,
+        CosmicMappedInternal, PopupMappedInternal,
     },
     minimize::MinimizeApplet,
     space::{corner_element::RoundedRectangleSettings, Alignment},
@@ -16,15 +17,14 @@ use crate::{
 use super::{panel_space::PanelClient, PanelSpace};
 use crate::xdg_shell_wrapper::space::WrapperSpace;
 use anyhow::bail;
-use cosmic::iced::id;
 use cosmic_panel_config::PanelAnchor;
 use itertools::{chain, Itertools};
-use once_cell::sync::Lazy;
 use sctk::shell::WaylandSurface;
 use smithay::{
     desktop::{space::SpaceElement, Space, Window},
     reexports::wayland_server::Resource,
     utils::{IsAlive, Physical, Rectangle, Size},
+    wayland::seat::WaylandFocus,
 };
 
 impl PanelSpace {
@@ -123,10 +123,9 @@ impl PanelSpace {
                 self.unmapped.push(w);
             }
         } else {
-            self.scale_change_retries -= 1;
+            self.scale_change_retries = self.scale_change_retries.saturating_sub(1);
         }
 
-        self.space.refresh();
         let is_dock = !self.config.expand_to_edges()
             || self.animate_state.as_ref().is_some_and(|a| !(a.cur.expanded > 0.5));
         let mut windows_left = to_map
@@ -798,9 +797,33 @@ impl PanelSpace {
                 });
                 t.send_pending_configure();
             }
-            overflow_space.map_element(w.0, (x, y), true);
+            overflow_space.map_element(PopupMappedInternal::Window(w.0), (x, y), true);
         }
         overflow_space.refresh();
+        let space = self.config.spacing as f32;
+        let padding = self.config.padding as f32;
+        let popup_major = overflow_cnt.min(8) as f32 * applet_size_unit as f32
+            + 2. * padding
+            + (overflow_cnt.saturating_sub(1) as f32) * space;
+        let popup_cross = (overflow_cnt as f32 / 8.).ceil() * applet_size_unit as f32;
+
+        let popup = overflow_space
+            .elements()
+            .find(|e| {
+                if let PopupMappedInternal::Popup(b) = e {
+                    b.with_program(|p| {
+                        &p.id
+                            == match section {
+                                OverflowSection::Left => &self.left_overflow_popup_id,
+                                OverflowSection::Center => &self.center_overflow_popup_id,
+                                OverflowSection::Right => &self.right_overflow_popup_id,
+                            }
+                    })
+                } else {
+                    false
+                }
+            })
+            .cloned();
 
         if !had_overflow_prev && overflow_space.elements().count() > 0 {
             // XXX the location will be adjusted later so this is ok
@@ -836,8 +859,27 @@ impl PanelSpace {
                 overflow_button_loc,
                 false,
             );
+            self.is_dirty = true;
             self.space.refresh();
             self.clear();
+        } else if let Some(overflow_popup) = popup {
+            overflow_space.unmap_elem(&overflow_popup);
+            overflow_space.map_element(
+                PopupMappedInternal::Popup(overflow_popup_element(
+                    match section {
+                        OverflowSection::Left => self.left_overflow_popup_id.clone(),
+                        OverflowSection::Center => self.center_overflow_popup_id.clone(),
+                        OverflowSection::Right => self.right_overflow_popup_id.clone(),
+                    },
+                    popup_major,
+                    popup_cross,
+                    self.loop_handle.clone(),
+                    self.colors.theme.clone(),
+                    self.space.id(),
+                )),
+                (0, 0),
+                false,
+            );
         }
 
         overflow
@@ -847,7 +889,7 @@ impl PanelSpace {
         mut extra_space: u32,
         is_horizontal: bool,
         space: &mut Space<CosmicMappedInternal>,
-        overflow_space: &mut Space<Window>,
+        overflow_space: &mut Space<PopupMappedInternal>,
         suggested_size: u32,
     ) -> u32 {
         // TODO move applets until extra_space is as close as possible to 0
@@ -860,8 +902,12 @@ impl PanelSpace {
             let applet_len =
                 if is_horizontal { w.bbox().size.w as u32 } else { w.bbox().size.h as u32 };
             if extra_space >= applet_len {
+                let w = match w {
+                    PopupMappedInternal::Window(w) => w,
+                    _ => continue,
+                };
                 extra_space = extra_space.saturating_sub(applet_len);
-                overflow_space.unmap_elem(&w);
+                overflow_space.unmap_elem(&PopupMappedInternal::Window(w.clone()));
                 overflow_space.refresh();
                 space.map_element(CosmicMappedInternal::Window(w.clone()), (0, 0), false);
                 space.refresh();
@@ -1034,7 +1080,7 @@ impl PanelSpace {
             .chain(self.overflow_right.elements())
         {
             let output_clone = output.clone();
-            if w.toplevel().is_some() {
+            if let PopupMappedInternal::Window(w) = w {
                 w.send_frame(&output, Duration::from_secs(1), None, |_, _| {
                     Some(output_clone.clone())
                 });
