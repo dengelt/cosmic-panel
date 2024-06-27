@@ -728,7 +728,7 @@ where
         } else {
             false
         };
-        let _ = internal_ref.update(true);
+        let _ = internal_ref.update(force);
         if let Some((buffer, ref mut old_primitives)) =
             internal_ref.buffers.get_mut(&OrderedFloat(scale.x))
         {

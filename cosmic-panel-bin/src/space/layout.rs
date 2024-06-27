@@ -818,18 +818,21 @@ impl PanelSpace {
             } else {
                 "view-more-symbolic"
             };
+            let e = overflow_button_element(
+                id,
+                (0, 0).into(),
+                u16::try_from(icon_size).unwrap_or(32),
+                (padding as f32).into(),
+                Arc::new(AtomicBool::new(false)),
+                icon.into(),
+                self.loop_handle.clone(),
+                self.colors.theme.clone(),
+                self.space.id(),
+            );
+            let output = self.output.as_ref().map(|o| &o.1).unwrap();
+            e.output_enter(&output, Default::default());
             self.space.map_element(
-                CosmicMappedInternal::OverflowButton(overflow_button_element(
-                    id,
-                    (0, 0).into(),
-                    u16::try_from(icon_size).unwrap_or(32),
-                    (padding as f32).into(),
-                    Arc::new(AtomicBool::new(false)),
-                    icon.into(),
-                    self.loop_handle.clone(),
-                    self.colors.theme.clone(),
-                    self.space.id(),
-                )),
+                CosmicMappedInternal::OverflowButton(e),
                 overflow_button_loc,
                 false,
             );

@@ -23,6 +23,7 @@ use crate::{
     },
 };
 use anyhow::bail;
+use cosmic::iced::id;
 use cosmic_panel_config::{CosmicPanelConfig, CosmicPanelOuput, NAME};
 use freedesktop_desktop_entry::{self, DesktopEntry, Iter};
 use itertools::izip;
@@ -833,6 +834,7 @@ impl WrapperSpace for PanelSpace {
                         self.generated_ptr_event_count.saturating_sub(1);
                     return None;
                 };
+
                 let mut bbox = e.bbox().to_f64();
                 bbox.size.w /= self.scale;
                 bbox.size.h /= self.scale;
@@ -1155,6 +1157,14 @@ impl WrapperSpace for PanelSpace {
         self.dimensions = dimensions;
         self.space_event = next_render_event;
         self.is_dirty = true;
+        self.left_overflow_button_id = id::Id::new(format!("left_overflow_button_{}", self.id()));
+        self.right_overflow_button_id = id::Id::new(format!("right_overflow_button_{}", self.id()));
+        self.center_overflow_button_id =
+            id::Id::new(format!("center_overflow_button_{}", self.id()));
+        self.left_overflow_popup_id = id::Id::new(format!("left_overflow_popup_{}", self.id()));
+        self.right_overflow_popup_id = id::Id::new(format!("right_overflow_popup_{}", self.id()));
+        self.center_overflow_popup_id = id::Id::new(format!("center_overflow_popup_{}", self.id()));
+
         if let Err(err) = self.spawn_clients(
             self.s_display.clone().unwrap(),
             &qh,
