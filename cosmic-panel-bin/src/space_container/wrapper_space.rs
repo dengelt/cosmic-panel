@@ -703,7 +703,7 @@ impl WrapperSpace for SpaceContainer {
         if let Some(space) = self
             .space_list
             .iter_mut()
-            .find(|s| s.popups.iter().any(|p| p.c_popup.wl_surface() == popup.wl_surface()))
+            .find(|s| s.popups.iter().any(|p| p.popup.c_popup.wl_surface() == popup.wl_surface()))
         {
             space.configure_panel_popup(popup, config, self.renderer.as_mut());
         }
@@ -734,7 +734,7 @@ impl WrapperSpace for SpaceContainer {
         if let Some(space) = self
             .space_list
             .iter_mut()
-            .find(|s| s.popups.iter().any(|p| p.c_popup.wl_surface() == popup.wl_surface()))
+            .find(|s| s.popups.iter().any(|p| p.popup.c_popup.wl_surface() == popup.wl_surface()))
         {
             space.close_popup(popup);
         }
@@ -812,7 +812,7 @@ impl WrapperSpace for SpaceContainer {
     ) {
         for s in &mut self.space_list {
             if s.layer.as_ref().map(|l| l.wl_surface()) == Some(surface)
-                || s.popups.iter().any(|p| p.c_popup.wl_surface() == surface)
+                || s.popups.iter().any(|p| p.popup.c_popup.wl_surface() == surface)
             {
                 s.scale_factor_changed(surface, scale, legacy);
                 break;

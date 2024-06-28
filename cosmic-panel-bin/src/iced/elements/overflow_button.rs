@@ -115,13 +115,17 @@ impl Program for OverflowButton {
                 let id = self.id.clone();
                 let panel_id = self.panel_id;
 
-                _ = loop_handle.insert_source(
-                    calloop::timer::Timer::immediate(),
-                    move |_, _, state| {
-                        state.space.toggle_overflow_popup(panel_id, id.clone());
-                        calloop::timer::TimeoutAction::Drop
-                    },
-                );
+                _ = loop_handle.insert_idle(move |state| {
+                    state.space.toggle_overflow_popup(
+                        panel_id,
+                        id.clone(),
+                        &state.client_state.compositor_state,
+                        state.client_state.fractional_scaling_manager.as_ref(),
+                        state.client_state.viewporter_state.as_ref(),
+                        &state.client_state.queue_handle,
+                        &mut state.client_state.xdg_shell_state,
+                    );
+                });
             },
         }
         cosmic::Command::none()

@@ -491,10 +491,26 @@ impl SpaceContainer {
         spaces
     }
 
-    pub fn toggle_overflow_popup(&mut self, panel_id: usize, _element_id: id::Id) {
+    pub fn toggle_overflow_popup(
+        &mut self,
+        panel_id: usize,
+        element_id: id::Id,
+        compositor_state: &sctk::compositor::CompositorState,
+        fractional_scale_manager: Option<&FractionalScalingManager>,
+        viewport: Option<&ViewporterState>,
+        qh: &QueueHandle<GlobalState>,
+        xdg_shell_state: &mut sctk::shell::xdg::XdgShell,
+    ) {
         for space in &mut self.space_list {
             if space.space.id() == panel_id {
-                // space.toggle_overflow_popup(element_id);
+                space.toggle_overflow_popup(
+                    element_id,
+                    compositor_state,
+                    fractional_scale_manager,
+                    viewport,
+                    qh,
+                    xdg_shell_state,
+                );
                 break;
             }
         }

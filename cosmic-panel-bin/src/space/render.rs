@@ -247,15 +247,15 @@ impl PanelSpace {
         let clear_color = [0.0, 0.0, 0.0, 0.0];
         // TODO Popup rendering optimization
         for p in self.popups.iter_mut().filter(|p| {
-            p.dirty
-                && p.egl_surface.is_some()
-                && p.state.is_none()
+            p.popup.dirty
+                && p.popup.egl_surface.is_some()
+                && p.popup.state.is_none()
                 && p.s_surface.alive()
-                && p.c_popup.wl_surface().is_alive()
-                && p.has_frame
+                && p.popup.c_popup.wl_surface().is_alive()
+                && p.popup.has_frame
         }) {
             renderer.unbind()?;
-            renderer.bind(p.egl_surface.as_ref().unwrap().clone())?;
+            renderer.bind(p.popup.egl_surface.as_ref().unwrap().clone())?;
 
             let elements: Vec<WaylandSurfaceRenderElement<_>> = render_elements_from_surface_tree(
                 renderer,
@@ -265,20 +265,20 @@ impl PanelSpace {
                 1.0,
                 smithay::backend::renderer::element::Kind::Unspecified,
             );
-            p.damage_tracked_renderer.render_output(
+            p.popup.damage_tracked_renderer.render_output(
                 renderer,
-                p.egl_surface.as_ref().unwrap().buffer_age().unwrap_or_default() as usize,
+                p.popup.egl_surface.as_ref().unwrap().buffer_age().unwrap_or_default() as usize,
                 &elements,
                 clear_color,
             )?;
 
-            p.egl_surface.as_ref().unwrap().swap_buffers(None)?;
+            p.popup.egl_surface.as_ref().unwrap().swap_buffers(None)?;
 
-            let wl_surface = p.c_popup.wl_surface().clone();
+            let wl_surface = p.popup.c_popup.wl_surface().clone();
             wl_surface.frame(qh, wl_surface.clone());
             wl_surface.commit();
-            p.dirty = false;
-            p.has_frame = false;
+            p.popup.dirty = false;
+            p.popup.has_frame = false;
         }
         renderer.unbind()?;
 

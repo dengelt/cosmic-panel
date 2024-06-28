@@ -14,7 +14,8 @@ use crate::{
         server_state::{ServerFocus, ServerPtrFocus},
         shared_state::GlobalState,
         space::{
-            ClientEglDisplay, ClientEglSurface, SpaceEvent, Visibility, WrapperPopup, WrapperSpace,
+            ClientEglDisplay, ClientEglSurface, PanelPopup, SpaceEvent, Visibility, WrapperPopup,
+            WrapperSpace,
         },
         util::smootherstep,
         wp_security_context::SecurityContextManager,
@@ -198,7 +199,7 @@ impl PanelColors {
     }
 }
 
-/// space for the cosmic panel
+// space for the cosmic panel
 #[derive(Debug)]
 pub(crate) struct PanelSpace {
     // XXX implicitly drops egl_surface first to avoid segfault
@@ -265,6 +266,7 @@ pub(crate) struct PanelSpace {
     pub left_overflow_popup_id: id::Id,
     pub center_overflow_popup_id: id::Id,
     pub right_overflow_popup_id: id::Id,
+    pub overflow_popup: Option<PanelPopup>,
 }
 
 impl PanelSpace {
@@ -340,6 +342,7 @@ impl PanelSpace {
             left_overflow_popup_id: id::Id::new(format!("{}-left-overflow-popup", name)),
             center_overflow_popup_id: id::Id::new(format!("{}-center-overflow-popup", name)),
             right_overflow_popup_id: id::Id::new(format!("{}-right-overflow-popup", name)),
+            overflow_popup: None,
         }
     }
 
@@ -418,8 +421,11 @@ impl PanelSpace {
                 |acc, (surface, _, f)| {
                     if self.layer.as_ref().is_some_and(|s| *s.wl_surface() == *surface)
                         || self.popups.iter().any(|p| {
-                            &p.c_popup.wl_surface() == &surface
-                                || self.popups.iter().any(|p| p.c_popup.wl_surface() == surface)
+                            &p.popup.c_popup.wl_surface() == &surface
+                                || self
+                                    .popups
+                                    .iter()
+                                    .any(|p| p.popup.c_popup.wl_surface() == surface)
                         })
                     {
                         match (&acc, &f) {
@@ -1131,8 +1137,7 @@ impl PanelSpace {
         } else if let Some(p) = self.popups.iter().find(|p| {
             s_surface.get_parent_surface().is_some_and(|s| &s == p.s_surface.wl_surface())
         }) {
-            // panic!("Popup parent surface not found in space");
-            p.rectangle.loc
+            p.popup.rectangle.loc
         } else {
             return;
         }; // TODO check overflow popup spaces too

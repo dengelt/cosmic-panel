@@ -46,14 +46,14 @@ impl PanelSpace {
         };
 
         if let Some(p) =
-            self.popups.iter_mut().find(|p| popup.wl_surface() == p.c_popup.wl_surface())
+            self.popups.iter_mut().find(|p| popup.wl_surface() == p.popup.c_popup.wl_surface())
         {
             // use the size that we have already
-            p.wrapper_rectangle =
+            p.popup.wrapper_rectangle =
                 Rectangle::from_loc_and_size(config.position, (config.width, config.height));
 
             let (width, height) = (config.width, config.height);
-            p.state = match p.state {
+            p.popup.state = match p.popup.state {
                 None | Some(WrapperPopupState::WaitConfigure) => None,
                 Some(r) => Some(r),
             };
@@ -62,12 +62,12 @@ impl PanelSpace {
             match config.kind {
                 popup::ConfigureKind::Initial => {
                     let wl_egl_surface =
-                        match WlEglSurface::new(p.c_popup.wl_surface().id(), width, height) {
+                        match WlEglSurface::new(p.popup.c_popup.wl_surface().id(), width, height) {
                             Ok(s) => s,
                             Err(_) => return,
                         };
                     let client_egl_surface = unsafe {
-                        ClientEglSurface::new(wl_egl_surface, p.c_popup.wl_surface().clone())
+                        ClientEglSurface::new(wl_egl_surface, p.popup.c_popup.wl_surface().clone())
                     };
                     let egl_surface = Rc::new(unsafe {
                         EGLSurface::new(
@@ -81,8 +81,8 @@ impl PanelSpace {
                         )
                         .expect("Failed to initialize EGL Surface")
                     });
-                    p.egl_surface.replace(egl_surface);
-                    p.dirty = true;
+                    p.popup.egl_surface.replace(egl_surface);
+                    p.popup.dirty = true;
                 },
                 popup::ConfigureKind::Reactive => {},
                 popup::ConfigureKind::Reposition { token: _token } => {},

@@ -15,7 +15,9 @@ use crate::{
         client_state::ClientFocus,
         server_state::ServerPointerFocus,
         shared_state::GlobalState,
-        space::{SpaceEvent, Visibility, WrapperPopup, WrapperPopupState, WrapperSpace},
+        space::{
+            PanelPopup, SpaceEvent, Visibility, WrapperPopup, WrapperPopupState, WrapperSpace,
+        },
         util::get_client_sock,
         wp_fractional_scaling::FractionalScalingManager,
         wp_security_context::{SecurityContext, SecurityContextManager},
@@ -136,7 +138,7 @@ impl WrapperSpace for PanelSpace {
 
         let parent = self.popups.iter().find_map(|p| {
             if s_surface.get_parent_surface().is_some_and(|s| &s == p.s_surface.wl_surface()) {
-                Some(p.c_popup.xdg_surface())
+                Some(p.popup.c_popup.xdg_surface())
             } else {
                 None
             }
@@ -206,24 +208,26 @@ impl WrapperSpace for PanelSpace {
         let cur_popup_state = Some(WrapperPopupState::WaitConfigure);
 
         self.popups.push(WrapperPopup {
-            damage_tracked_renderer: OutputDamageTracker::new(
-                positioner_state.rect_size.to_f64().to_physical(self.scale).to_i32_round(),
-                1.0,
-                smithay::utils::Transform::Flipped180,
-            ),
-            c_popup,
+            popup: PanelPopup {
+                damage_tracked_renderer: OutputDamageTracker::new(
+                    positioner_state.rect_size.to_f64().to_physical(self.scale).to_i32_round(),
+                    1.0,
+                    smithay::utils::Transform::Flipped180,
+                ),
+                c_popup,
+                egl_surface: None,
+                dirty: false,
+                rectangle: Rectangle::from_loc_and_size((0, 0), positioner_state.rect_size),
+                state: cur_popup_state,
+                input_region,
+                wrapper_rectangle: Rectangle::from_loc_and_size((0, 0), positioner_state.rect_size),
+                positioner,
+                has_frame: true,
+                fractional_scale,
+                viewport,
+                scale: self.scale,
+            },
             s_surface,
-            egl_surface: None,
-            dirty: false,
-            rectangle: Rectangle::from_loc_and_size((0, 0), positioner_state.rect_size),
-            state: cur_popup_state,
-            input_region,
-            wrapper_rectangle: Rectangle::from_loc_and_size((0, 0), positioner_state.rect_size),
-            positioner,
-            has_frame: true,
-            fractional_scale,
-            viewport,
-            scale: self.scale,
         });
 
         Ok(())
@@ -239,8 +243,8 @@ impl WrapperSpace for PanelSpace {
             pending.geometry = Rectangle::from_loc_and_size((0, 0), pos_state.rect_size);
         });
         if let Some(p) = self.popups.iter().find(|wp| &wp.s_surface == &popup) {
-            let positioner = &p.positioner;
-            p.c_popup.xdg_surface().set_window_geometry(
+            let positioner = &p.popup.positioner;
+            p.popup.c_popup.xdg_surface().set_window_geometry(
                 0,
                 0,
                 pos_state.rect_size.w.max(1),
@@ -249,9 +253,9 @@ impl WrapperSpace for PanelSpace {
             self.apply_positioner_state(&positioner, pos_state, &p.s_surface);
 
             if positioner.version() >= 3 {
-                p.c_popup.reposition(&positioner, token);
+                p.popup.c_popup.reposition(&positioner, token);
             }
-            p.c_popup.wl_surface().commit();
+            p.popup.c_popup.wl_surface().commit();
             if positioner.version() >= 3 {
                 popup.send_repositioned(token);
             }
@@ -696,8 +700,8 @@ impl WrapperSpace for PanelSpace {
                 .to_logical(self.scale)
                 .to_i32_round();
             let p_geo = PopupKind::Xdg(p.s_surface.clone()).geometry();
-            if p_bbox != p.rectangle && p_bbox.size.w > 0 && p_bbox.size.h > 0 {
-                p.c_popup.xdg_surface().set_window_geometry(
+            if p_bbox != p.popup.rectangle && p_bbox.size.w > 0 && p_bbox.size.h > 0 {
+                p.popup.c_popup.xdg_surface().set_window_geometry(
                     p_geo.loc.x,
                     p_geo.loc.y,
                     p_geo.size.w.max(1),
@@ -711,26 +715,29 @@ impl WrapperSpace for PanelSpace {
                         .as_ref()
                         .cloned()
                 }) {
-                    p.input_region.subtract(
+                    p.popup.input_region.subtract(
                         p_bbox.loc.x,
                         p_bbox.loc.y,
                         p_bbox.size.w,
                         p_bbox.size.h,
                     );
                     for r in input_regions.rects {
-                        p.input_region.add(0, 0, r.1.size.w, r.1.size.h);
+                        p.popup.input_region.add(0, 0, r.1.size.w, r.1.size.h);
                     }
-                    p.c_popup.wl_surface().set_input_region(Some(p.input_region.wl_region()));
+                    p.popup
+                        .c_popup
+                        .wl_surface()
+                        .set_input_region(Some(p.popup.input_region.wl_region()));
                 }
 
-                p.state = Some(WrapperPopupState::Rectangle {
+                p.popup.state = Some(WrapperPopupState::Rectangle {
                     x: p_bbox.loc.x,
                     y: p_bbox.loc.y,
                     width: p_bbox.size.w.max(1),
                     height: p_bbox.size.h.max(1),
                 });
             }
-            p.dirty = true;
+            p.popup.dirty = true;
         }
     }
 
@@ -798,7 +805,7 @@ impl WrapperSpace for PanelSpace {
         let prev_foc = self.s_focused_surface.iter_mut().find(|f| f.1 == seat_name);
         // first check if the motion is on a popup's client surface
         let ret = if let Some(p) =
-            self.popups.iter().find(|p| p.c_popup.wl_surface() == &c_wl_surface)
+            self.popups.iter().find(|p| p.popup.c_popup.wl_surface() == &c_wl_surface)
         {
             let geo = smithay::desktop::PopupKind::Xdg(p.s_surface.clone()).geometry();
             // special handling for popup bc they exist on their own client surface
@@ -810,8 +817,8 @@ impl WrapperSpace for PanelSpace {
                     .push((p.s_surface.wl_surface().clone().into(), seat_name.to_string()));
             }
             if let Some((_, prev_foc)) = prev_hover.as_mut() {
-                prev_foc.c_pos = p.rectangle.loc;
-                prev_foc.s_pos = (p.rectangle.loc - geo.loc).to_f64();
+                prev_foc.c_pos = p.popup.rectangle.loc;
+                prev_foc.s_pos = (p.popup.rectangle.loc - geo.loc).to_f64();
 
                 prev_foc.surface = p.s_surface.wl_surface().clone().into();
                 Some(prev_foc.clone())
@@ -819,8 +826,8 @@ impl WrapperSpace for PanelSpace {
                 self.s_hovered_surface.push(ServerPointerFocus {
                     surface: p.s_surface.wl_surface().clone().into(),
                     seat_name: seat_name.to_string(),
-                    c_pos: p.rectangle.loc,
-                    s_pos: (p.rectangle.loc - geo.loc).to_f64(),
+                    c_pos: p.popup.rectangle.loc,
+                    s_pos: (p.popup.rectangle.loc - geo.loc).to_f64(),
                 });
                 self.s_hovered_surface.last().cloned()
             }
@@ -1041,7 +1048,7 @@ impl WrapperSpace for PanelSpace {
 
     fn close_popup(&mut self, popup: &sctk::shell::xdg::popup::Popup) {
         self.popups.retain(|p| {
-            if p.c_popup.wl_surface() == popup.wl_surface() {
+            if p.popup.c_popup.wl_surface() == popup.wl_surface() {
                 if p.s_surface.alive() {
                     p.s_surface.send_popup_done();
                 }
@@ -1200,8 +1207,10 @@ impl WrapperSpace for PanelSpace {
     fn frame(&mut self, surface: &c_wl_surface::WlSurface, _time: u32) {
         if Some(surface) == self.layer.as_ref().map(|l| l.wl_surface()) {
             self.has_frame = true;
-        } else if let Some(p) = self.popups.iter_mut().find(|p| surface == p.c_popup.wl_surface()) {
-            p.has_frame = true;
+        } else if let Some(p) =
+            self.popups.iter_mut().find(|p| surface == p.popup.c_popup.wl_surface())
+        {
+            p.popup.has_frame = true;
         }
     }
 
@@ -1258,13 +1267,13 @@ impl WrapperSpace for PanelSpace {
             }
         }
         for popup in &mut self.popups {
-            if popup.c_popup.wl_surface() != surface {
+            if popup.popup.c_popup.wl_surface() != surface {
                 continue;
             }
-            popup.scale = scale;
-            let Rectangle { loc, size } = popup.rectangle;
-            if popup.state.is_none() {
-                popup.state = Some(WrapperPopupState::Rectangle {
+            popup.popup.scale = scale;
+            let Rectangle { loc, size } = popup.popup.rectangle;
+            if popup.popup.state.is_none() {
+                popup.popup.state = Some(WrapperPopupState::Rectangle {
                     x: loc.x,
                     y: loc.y,
                     width: size.w,
