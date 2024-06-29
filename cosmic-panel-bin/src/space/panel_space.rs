@@ -81,7 +81,10 @@ use cosmic_panel_config::{CosmicPanelBackground, CosmicPanelConfig, PanelAnchor}
 
 use crate::{iced::elements::CosmicMappedInternal, PanelCalloopMsg};
 
-use super::corner_element::{init_shaders, RoundedRectangleSettings};
+use super::{
+    corner_element::{init_shaders, RoundedRectangleSettings},
+    layout::OverflowSection,
+};
 
 pub enum AppletMsg {
     NewProcess(String, Process),
@@ -266,7 +269,7 @@ pub(crate) struct PanelSpace {
     pub left_overflow_popup_id: id::Id,
     pub center_overflow_popup_id: id::Id,
     pub right_overflow_popup_id: id::Id,
-    pub overflow_popup: Option<PanelPopup>,
+    pub overflow_popup: Option<(PanelPopup, OverflowSection)>,
 }
 
 impl PanelSpace {
@@ -842,6 +845,7 @@ impl PanelSpace {
         if let Some(renderer) = renderer.as_mut() {
             let prev = self.popups.len();
             self.popups.retain_mut(|p: &mut WrapperPopup| p.handle_events(popup_manager));
+            self.handle_overflow_popup_events();
 
             if prev == self.popups.len() && should_render {
                 if let Err(e) = self.render(renderer, time, qh) {

@@ -60,7 +60,7 @@ pub struct PanelPopup {
     /// full rectangle of the inner popup, including dropshadow borders
     pub rectangle: Rectangle<i32, Logical>,
     /// input region for the popup
-    pub input_region: Region,
+    pub input_region: Option<Region>,
     /// location of the popup wrapper
     pub wrapper_rectangle: Rectangle<i32, Logical>,
     /// positioner

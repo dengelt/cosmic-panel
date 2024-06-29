@@ -219,7 +219,7 @@ impl WrapperSpace for PanelSpace {
                 dirty: false,
                 rectangle: Rectangle::from_loc_and_size((0, 0), positioner_state.rect_size),
                 state: cur_popup_state,
-                input_region,
+                input_region: Some(input_region),
                 wrapper_rectangle: Rectangle::from_loc_and_size((0, 0), positioner_state.rect_size),
                 positioner,
                 has_frame: true,
@@ -707,27 +707,22 @@ impl WrapperSpace for PanelSpace {
                     p_geo.size.w.max(1),
                     p_geo.size.h.max(1),
                 );
-                if let Some(input_regions) = with_states(p.s_surface.wl_surface(), |states| {
-                    states
-                        .cached_state
-                        .current::<SurfaceAttributes>()
-                        .input_region
-                        .as_ref()
-                        .cloned()
-                }) {
-                    p.popup.input_region.subtract(
-                        p_bbox.loc.x,
-                        p_bbox.loc.y,
-                        p_bbox.size.w,
-                        p_bbox.size.h,
-                    );
+                if let Some((input_regions, my_region)) =
+                    with_states(p.s_surface.wl_surface(), |states| {
+                        states
+                            .cached_state
+                            .current::<SurfaceAttributes>()
+                            .input_region
+                            .as_ref()
+                            .cloned()
+                    })
+                    .zip(p.popup.input_region.as_ref())
+                {
+                    my_region.subtract(p_bbox.loc.x, p_bbox.loc.y, p_bbox.size.w, p_bbox.size.h);
                     for r in input_regions.rects {
-                        p.popup.input_region.add(0, 0, r.1.size.w, r.1.size.h);
+                        my_region.add(0, 0, r.1.size.w, r.1.size.h);
                     }
-                    p.popup
-                        .c_popup
-                        .wl_surface()
-                        .set_input_region(Some(p.popup.input_region.wl_region()));
+                    p.popup.c_popup.wl_surface().set_input_region(Some(my_region.wl_region()));
                 }
 
                 p.popup.state = Some(WrapperPopupState::Rectangle {

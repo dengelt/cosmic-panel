@@ -1,9 +1,10 @@
 use std::time::Duration;
 
-use crate::iced::elements::CosmicMappedInternal;
+use crate::{iced::elements::CosmicMappedInternal, xdg_shell_wrapper::space::PanelPopup};
 
 use super::{
     corner_element::{RoundedRectangleShader, RoundedRectangleShaderElement},
+    layout::OverflowSection,
     PanelSpace,
 };
 use cctk::wayland_client::{Proxy, QueueHandle};
@@ -22,6 +23,7 @@ use smithay::{
         Bind, Frame, Renderer, Unbind,
     },
     utils::{Buffer, Physical, Rectangle},
+    wayland::seat::WaylandFocus,
 };
 pub(crate) enum PanelRenderElement {
     Wayland(
@@ -280,6 +282,91 @@ impl PanelSpace {
             p.popup.dirty = false;
             p.popup.has_frame = false;
         }
+
+        // render to overflow_popup
+        if let Some((ref mut p, section)) = self.overflow_popup.as_mut().filter(|(p, _)| {
+            p.dirty
+                && p.egl_surface.is_some()
+                && p.state.is_none()
+                && p.c_popup.wl_surface().is_alive()
+        }) {
+            renderer.unbind()?;
+            renderer.bind(p.egl_surface.as_ref().unwrap().clone())?;
+            let elements = match section {
+                OverflowSection::Center => self.overflow_center.elements(),
+                OverflowSection::Left => self.overflow_left.elements(),
+                OverflowSection::Right => self.overflow_right.elements(),
+            };
+            let mut bg_render_element = None;
+            let elements: Vec<PanelRenderElement> = elements
+                .filter_map(|e| match e {
+                    crate::iced::elements::PopupMappedInternal::Popup(_) => {
+                        // move to bg_render_element
+                        bg_render_element = Some(e);
+                        None
+                    },
+                    crate::iced::elements::PopupMappedInternal::Window(w) => {
+                        let Some(t) = w.toplevel() else {
+                            return None;
+                        };
+
+                        let loc = self
+                            .space
+                            .element_location(&CosmicMappedInternal::Window(w.clone()))
+                            .unwrap_or_default()
+                            .to_f64()
+                            .to_physical(self.scale)
+                            .to_i32_round();
+                        Some(
+                            render_elements_from_surface_tree(
+                                renderer,
+                                t.wl_surface(),
+                                loc,
+                                self.scale,
+                                1.0,
+                                smithay::backend::renderer::element::Kind::Unspecified,
+                            )
+                            .into_iter()
+                            .map(|r: WaylandSurfaceRenderElement<GlesRenderer>| {
+                                let mut src = r.src();
+                                let mut geo = r.geometry(self.scale.into());
+                                if let Some(size) = t.current_state().size {
+                                    let scaled_size = size
+                                        .to_f64()
+                                        .to_buffer(self.scale, smithay::utils::Transform::Normal)
+                                        .to_i32_ceil();
+                                    if size.w > 0 && scaled_size.w < src.size.w {
+                                        src.size.w = scaled_size.w;
+                                        geo.size.w = scaled_size.w.ceil() as i32;
+                                    }
+                                    if size.h > 0 && scaled_size.h < src.size.h {
+                                        src.size.h = scaled_size.h;
+                                        geo.size.h = scaled_size.h.ceil() as i32;
+                                    }
+                                }
+                                PanelRenderElement::Wayland(r, src, geo)
+                            })
+                            .collect::<Vec<_>>(),
+                        )
+                    },
+                    crate::iced::elements::PopupMappedInternal::_GenericCatcher(_) => return None,
+                })
+                .flatten()
+                .collect();
+
+            _ = p.damage_tracked_renderer.render_output(
+                renderer,
+                p.egl_surface.as_ref().unwrap().buffer_age().unwrap_or_default() as usize,
+                &elements,
+                clear_color,
+            );
+
+            p.egl_surface.as_ref().unwrap().swap_buffers(None)?;
+            let wl_surface = p.c_popup.wl_surface().clone();
+            wl_surface.frame(qh, wl_surface.clone());
+            wl_surface.commit();
+        }
+
         renderer.unbind()?;
 
         Ok(())

@@ -824,7 +824,20 @@ impl PanelSpace {
                 }
             })
             .cloned();
-
+        let new_popup = || {
+            PopupMappedInternal::Popup(overflow_popup_element(
+                match section {
+                    OverflowSection::Left => self.left_overflow_popup_id.clone(),
+                    OverflowSection::Center => self.center_overflow_popup_id.clone(),
+                    OverflowSection::Right => self.right_overflow_popup_id.clone(),
+                },
+                popup_major,
+                popup_cross,
+                self.loop_handle.clone(),
+                self.colors.theme.clone(),
+                self.space.id(),
+            ))
+        };
         if !had_overflow_prev && overflow_space.elements().count() > 0 {
             // XXX the location will be adjusted later so this is ok
             let overflow_button_loc = (0, 0);
@@ -854,32 +867,19 @@ impl PanelSpace {
             );
             let output = self.output.as_ref().map(|o| &o.1).unwrap();
             e.output_enter(&output, Default::default());
+            overflow_space.map_element(new_popup(), (0, 0), false);
             self.space.map_element(
                 CosmicMappedInternal::OverflowButton(e),
                 overflow_button_loc,
                 false,
             );
+
             self.is_dirty = true;
             self.space.refresh();
             self.clear();
         } else if let Some(overflow_popup) = popup {
             overflow_space.unmap_elem(&overflow_popup);
-            overflow_space.map_element(
-                PopupMappedInternal::Popup(overflow_popup_element(
-                    match section {
-                        OverflowSection::Left => self.left_overflow_popup_id.clone(),
-                        OverflowSection::Center => self.center_overflow_popup_id.clone(),
-                        OverflowSection::Right => self.right_overflow_popup_id.clone(),
-                    },
-                    popup_major,
-                    popup_cross,
-                    self.loop_handle.clone(),
-                    self.colors.theme.clone(),
-                    self.space.id(),
-                )),
-                (0, 0),
-                false,
-            );
+            overflow_space.map_element(new_popup(), (0, 0), false);
         }
 
         overflow

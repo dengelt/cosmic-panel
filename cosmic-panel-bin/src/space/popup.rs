@@ -45,29 +45,36 @@ impl PanelSpace {
             return;
         };
 
-        if let Some(p) =
-            self.popups.iter_mut().find(|p| popup.wl_surface() == p.popup.c_popup.wl_surface())
+        if let Some((p, s_popup)) = self
+            .popups
+            .iter_mut()
+            .map(|p| (&mut p.popup, Some(&mut p.s_surface)))
+            .chain(self.overflow_popup.iter_mut().map(|p| (&mut p.0, None)))
+            .find(|(p, _)| popup.wl_surface() == p.c_popup.wl_surface())
         {
             // use the size that we have already
-            p.popup.wrapper_rectangle =
+            p.wrapper_rectangle =
                 Rectangle::from_loc_and_size(config.position, (config.width, config.height));
 
             let (width, height) = (config.width, config.height);
-            p.popup.state = match p.popup.state {
+            p.state = match p.state {
                 None | Some(WrapperPopupState::WaitConfigure) => None,
                 Some(r) => Some(r),
             };
 
-            let _ = p.s_surface.send_configure();
+            if let Some(s) = s_popup {
+                _ = s.send_configure()
+            }
+
             match config.kind {
                 popup::ConfigureKind::Initial => {
                     let wl_egl_surface =
-                        match WlEglSurface::new(p.popup.c_popup.wl_surface().id(), width, height) {
+                        match WlEglSurface::new(p.c_popup.wl_surface().id(), width, height) {
                             Ok(s) => s,
                             Err(_) => return,
                         };
                     let client_egl_surface = unsafe {
-                        ClientEglSurface::new(wl_egl_surface, p.popup.c_popup.wl_surface().clone())
+                        ClientEglSurface::new(wl_egl_surface, p.c_popup.wl_surface().clone())
                     };
                     let egl_surface = Rc::new(unsafe {
                         EGLSurface::new(
@@ -81,8 +88,8 @@ impl PanelSpace {
                         )
                         .expect("Failed to initialize EGL Surface")
                     });
-                    p.popup.egl_surface.replace(egl_surface);
-                    p.popup.dirty = true;
+                    p.egl_surface.replace(egl_surface);
+                    p.dirty = true;
                 },
                 popup::ConfigureKind::Reactive => {},
                 popup::ConfigureKind::Reposition { token: _token } => {},

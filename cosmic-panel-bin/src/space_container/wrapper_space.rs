@@ -700,12 +700,8 @@ impl WrapperSpace for SpaceContainer {
         popup: &sctk::shell::xdg::popup::Popup,
         config: sctk::shell::xdg::popup::PopupConfigure,
     ) {
-        if let Some(space) = self
-            .space_list
-            .iter_mut()
-            .find(|s| s.popups.iter().any(|p| p.popup.c_popup.wl_surface() == popup.wl_surface()))
-        {
-            space.configure_panel_popup(popup, config, self.renderer.as_mut());
+        for space in &mut self.space_list {
+            space.configure_panel_popup(popup, config.clone(), self.renderer.as_mut());
         }
     }
 

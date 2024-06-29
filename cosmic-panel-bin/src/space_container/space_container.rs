@@ -503,14 +503,16 @@ impl SpaceContainer {
     ) {
         for space in &mut self.space_list {
             if space.space.id() == panel_id {
-                space.toggle_overflow_popup(
+                if let Err(err) = space.toggle_overflow_popup(
                     element_id,
                     compositor_state,
                     fractional_scale_manager,
                     viewport,
                     qh,
                     xdg_shell_state,
-                );
+                ) {
+                    error!("Failed to toggle overflow popup: {}", err);
+                }
                 break;
             }
         }

@@ -1,29 +1,50 @@
 use std::rc::Rc;
 
-use cctk::wayland_client::QueueHandle;
-use cosmic::iced::id;
-use sctk::{
-    compositor::Region,
-    shell::xdg::{popup::Popup, XdgPositioner},
+use anyhow::bail;
+use cctk::{
+    sctk::{
+        compositor::Region,
+        shell::xdg::{
+            popup::{self, Popup},
+            XdgPositioner,
+        },
+    },
+    wayland_client::{Proxy, QueueHandle},
 };
+use cosmic::iced::id;
+
+use cosmic_panel_config::PanelAnchor;
 use smithay::{
     backend::{
         egl::EGLSurface,
         renderer::{damage::OutputDamageTracker, element},
     },
-    utils::{Logical, Rectangle},
+    desktop::space::SpaceElement,
+    utils::{Logical, Rectangle, Size},
+    wayland::{
+        compositor::{with_states, SurfaceAttributes},
+        shell::xdg::SurfaceCachedState,
+    },
 };
-use wayland_protocols::wp::{
-    fractional_scale::v1::client::wp_fractional_scale_v1::WpFractionalScaleV1,
-    viewporter::client::wp_viewport::WpViewport,
+use wayland_protocols::{
+    wp::{
+        fractional_scale::v1::client::wp_fractional_scale_v1::WpFractionalScaleV1,
+        viewporter::client::wp_viewport::WpViewport,
+    },
+    xdg::shell::client::xdg_positioner::{self, Anchor, Gravity},
 };
 
-use crate::xdg_shell_wrapper::{
-    shared_state::GlobalState, space::WrapperPopupState,
-    wp_fractional_scaling::FractionalScalingManager, wp_viewporter::ViewporterState,
+use crate::{
+    iced::elements::{CosmicMappedInternal, PopupMappedInternal},
+    xdg_shell_wrapper::{
+        shared_state::GlobalState,
+        space::{PanelPopup, WrapperPopupState},
+        wp_fractional_scaling::FractionalScalingManager,
+        wp_viewporter::ViewporterState,
+    },
 };
 
-use super::PanelSpace;
+use super::{layout::OverflowSection, PanelSpace};
 
 impl PanelSpace {
     pub fn toggle_overflow_popup(
@@ -34,110 +55,158 @@ impl PanelSpace {
         viewport: Option<&ViewporterState>,
         qh: &QueueHandle<GlobalState>,
         xdg_shell_state: &mut sctk::shell::xdg::XdgShell,
-    ) {
+    ) -> anyhow::Result<()> {
         if self.overflow_popup.is_some() {
             self.overflow_popup = None;
-            return;
+            return Ok(());
         }
         // get popup location and anchor based on element_id and panel
-        // let positioner = XdgPositioner::new(wm_base)
         // anchor create popup using sctk
         let c_wl_surface = compositor_state.create_surface(qh);
 
-        // let parent = self.popups.iter().find_map(|p| {
-        //     if s_surface.get_parent_surface().is_some_and(|s| &s ==
-        // p.s_surface.wl_surface()) {         Some(p.c_popup.
-        // xdg_surface())     } else {
-        //         None
-        //     }
-        // });
+        let (Some((element, section)), Some(popup_element)) =
+            self.overflow_elements_for_id(&element_id)
+        else {
+            bail!("No element found with id: {:?}", element_id);
+        };
+        let bbox = element.bbox();
+        let positioner = XdgPositioner::new(xdg_shell_state).unwrap();
+        positioner.set_size(bbox.size.w, bbox.size.h);
+        positioner.set_anchor_rect(bbox.loc.x, bbox.loc.y, bbox.size.w, bbox.size.h);
+        let pixel_offset = 8;
+        let (offset, anchor, gravity) = match self.config.anchor {
+            PanelAnchor::Left => ((pixel_offset, 0), Anchor::Right, Gravity::Right),
+            PanelAnchor::Right => ((-pixel_offset, 0), Anchor::Left, Gravity::Left),
+            PanelAnchor::Top => ((0, pixel_offset), Anchor::Bottom, Gravity::Bottom),
+            PanelAnchor::Bottom => ((0, -pixel_offset), Anchor::Top, Gravity::Top),
+        };
+        positioner.set_anchor(anchor);
+        positioner.set_gravity(gravity);
+        positioner.set_constraint_adjustment(
+            xdg_positioner::ConstraintAdjustment::FlipY
+                | xdg_positioner::ConstraintAdjustment::FlipX
+                | xdg_positioner::ConstraintAdjustment::SlideX
+                | xdg_positioner::ConstraintAdjustment::SlideY,
+        );
+        positioner.set_offset(offset.0, offset.1);
 
-        // let c_popup = popup::Popup::from_surface(
-        //     parent,
-        //     &positioner,
-        //     qh,
-        //     c_wl_surface.clone(),
-        //     xdg_shell_state,
-        // )?;
+        let c_popup = popup::Popup::from_surface(
+            None,
+            &positioner,
+            qh,
+            c_wl_surface.clone(),
+            xdg_shell_state,
+        )?;
+        let popup_bbox = popup_element.bbox();
 
-        // let input_region = Region::new(compositor_state)?;
+        c_popup.xdg_surface().set_window_geometry(
+            popup_bbox.loc.x,
+            popup_bbox.loc.y,
+            popup_bbox.size.w.max(1),
+            popup_bbox.size.h.max(1),
+        );
+        self.layer.as_ref().unwrap().get_popup(c_popup.xdg_popup());
 
-        // if let (Some(s_window_geometry), Some(input_regions)) =
-        //     with_states(s_surface.wl_surface(), |states| {
-        //         (
-        //
-        // states.cached_state.current::<SurfaceCachedState>().geometry,
-        //             states
-        //                 .cached_state
-        //                 .current::<SurfaceAttributes>()
-        //                 .input_region
-        //                 .as_ref()
-        //                 .cloned(),
-        //         )
-        //     })
-        // {
-        //     c_popup.xdg_surface().set_window_geometry(
-        //         s_window_geometry.loc.x,
-        //         s_window_geometry.loc.y,
-        //         s_window_geometry.size.w.max(1),
-        //         s_window_geometry.size.h.max(1),
-        //     );
-        //     for r in input_regions.rects {
-        //         input_region.add(0, 0, r.1.size.w, r.1.size.h);
-        //     }
-        //     c_wl_surface.set_input_region(Some(input_region.wl_region()));
-        // }
+        let fractional_scale =
+            fractional_scale_manager.map(|f| f.fractional_scaling(&c_wl_surface, &qh));
 
-        // if parent.is_none() {
-        //     self.layer.as_ref().unwrap().get_popup(c_popup.xdg_popup());
-        // }
-        // let fractional_scale =
-        //     fractional_scale_manager.map(|f|
-        // f.fractional_scaling(&c_wl_surface, &qh));
+        let viewport = viewport.map(|v| {
+            let viewport = v.get_viewport(&c_wl_surface, &qh);
+            viewport.set_destination(popup_bbox.size.w.max(1), popup_bbox.size.h.max(1));
+            viewport
+        });
+        if fractional_scale.is_none() {
+            c_wl_surface.set_buffer_scale(self.scale as i32);
+        }
 
-        // let viewport = viewport.map(|v| {
-        //     with_states(&s_surface.wl_surface(), |states| {
-        //         with_fractional_scale(states, |fractional_scale| {
-        //             fractional_scale.set_preferred_scale(self.scale);
-        //         });
-        //     });
-        //     let viewport = v.get_viewport(&c_wl_surface, &qh);
-        //     viewport.set_destination(
-        //         positioner_state.rect_size.w.max(1),
-        //         positioner_state.rect_size.h.max(1),
-        //     );
-        //     viewport
-        // });
-        // if fractional_scale.is_none() {
-        //     c_wl_surface.set_buffer_scale(self.scale as i32);
-        // }
+        // must be done after role is assigned as popup
+        c_wl_surface.commit();
 
-        // // must be done after role is assigned as popup
-        // c_wl_surface.commit();
+        self.overflow_popup = Some((
+            PanelPopup {
+                damage_tracked_renderer: OutputDamageTracker::new(
+                    popup_bbox.size.to_f64().to_physical(self.scale).to_i32_round(),
+                    1.0,
+                    smithay::utils::Transform::Flipped180,
+                ),
+                c_popup,
+                egl_surface: None,
+                dirty: false,
+                rectangle: Rectangle::from_loc_and_size((0, 0), popup_bbox.size),
+                state: Some(WrapperPopupState::WaitConfigure),
+                wrapper_rectangle: Rectangle::from_loc_and_size((0, 0), popup_bbox.size),
+                positioner,
+                has_frame: true,
+                fractional_scale,
+                viewport,
+                scale: self.scale,
+                input_region: None,
+            },
+            section,
+        ));
 
-        // let cur_popup_state = Some(WrapperPopupState::WaitConfigure);
+        Ok(())
+    }
 
-        // self.popups.push(WrapperPopup {
-        //     damage_tracked_renderer: OutputDamageTracker::new(
-        //         positioner_state.rect_size.to_f64().to_physical(self.scale).
-        // to_i32_round(),         1.0,
-        //         smithay::utils::Transform::Flipped180,
-        //     ),
-        //     c_popup,
-        //     s_surface,
-        //     egl_surface: None,
-        //     dirty: false,
-        //     rectangle: Rectangle::from_loc_and_size((0, 0),
-        // positioner_state.rect_size),     state: cur_popup_state,
-        //     input_region,
-        //     wrapper_rectangle: Rectangle::from_loc_and_size((0, 0),
-        // positioner_state.rect_size),     positioner,
-        //     has_frame: true,
-        //     fractional_scale,
-        //     viewport,
-        //     scale: self.scale,
-        // });
+    fn overflow_elements_for_id(
+        &self,
+        element_id: &id::Id,
+    ) -> (Option<(CosmicMappedInternal, OverflowSection)>, Option<(PopupMappedInternal)>) {
+        let element = self.space.elements().find_map(|e| match e {
+            CosmicMappedInternal::OverflowButton(b) => b.with_program(|p| {
+                (&p.id == element_id).then_some((
+                    e.clone(),
+                    if &self.left_overflow_button_id == &p.id {
+                        OverflowSection::Left
+                    } else if &self.right_overflow_button_id == &p.id {
+                        OverflowSection::Right
+                    } else {
+                        OverflowSection::Center
+                    },
+                ))
+            }),
+            _ => None,
+        });
+        let popup_element = element
+            .as_ref()
+            .map(|(_, section)| match section {
+                OverflowSection::Left => self.overflow_left.elements(),
+                OverflowSection::Right => self.overflow_right.elements(),
+                OverflowSection::Center => self.overflow_center.elements(),
+            })
+            .and_then(|mut elements| elements.find(|e| matches!(e, PopupMappedInternal::Popup(_))));
+        (element, popup_element.cloned())
+    }
 
-        // Ok(())
+    pub fn handle_overflow_popup_events(&mut self) {
+        self.overflow_popup = self
+            .overflow_popup
+            .take()
+            .into_iter()
+            .filter_map(|(mut p, section)| {
+                if let Some(WrapperPopupState::Rectangle { width, height, x, y }) = p.state {
+                    p.dirty = true;
+                    p.rectangle = Rectangle::from_loc_and_size((x, y), (width, height));
+                    let scaled_size: Size<i32, _> =
+                        p.rectangle.size.to_f64().to_physical(p.scale).to_i32_round();
+                    if let Some(s) = p.egl_surface.as_ref() {
+                        s.resize(scaled_size.w.max(1), scaled_size.h.max(1), 0, 0);
+                    }
+                    if let Some(viewport) = p.viewport.as_ref() {
+                        viewport
+                            .set_destination(p.rectangle.size.w.max(1), p.rectangle.size.h.max(1));
+                    }
+                    p.damage_tracked_renderer = OutputDamageTracker::new(
+                        scaled_size,
+                        1.0,
+                        smithay::utils::Transform::Flipped180,
+                    );
+                    p.c_popup.wl_surface().commit();
+
+                    p.state = None;
+                }
+                Some((p, section))
+            })
+            .next();
     }
 }
