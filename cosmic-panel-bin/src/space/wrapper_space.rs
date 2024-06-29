@@ -143,6 +143,7 @@ impl WrapperSpace for PanelSpace {
                 None
             }
         });
+        self.overflow_popup = None;
 
         let c_popup = popup::Popup::from_surface(
             parent,

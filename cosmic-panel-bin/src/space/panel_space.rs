@@ -1107,6 +1107,7 @@ impl PanelSpace {
     pub fn clear(&mut self) {
         self.is_dirty = true;
         self.popups.clear();
+        self.overflow_popup = None;
         self.damage_tracked_renderer = Some(OutputDamageTracker::new(
             self.dimensions.to_f64().to_physical(self.scale).to_i32_round(),
             1.0,

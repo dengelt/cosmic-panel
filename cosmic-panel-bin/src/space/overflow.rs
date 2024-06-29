@@ -56,6 +56,7 @@ impl PanelSpace {
         qh: &QueueHandle<GlobalState>,
         xdg_shell_state: &mut sctk::shell::xdg::XdgShell,
     ) -> anyhow::Result<()> {
+        self.popups.clear();
         if self.overflow_popup.is_some() {
             self.overflow_popup = None;
             return Ok(());
@@ -69,10 +70,11 @@ impl PanelSpace {
         else {
             bail!("No element found with id: {:?}", element_id);
         };
+        let loc = self.space.element_location(&element).unwrap_or_default();
         let bbox = element.bbox();
         let positioner = XdgPositioner::new(xdg_shell_state).unwrap();
-        positioner.set_size(bbox.size.w, bbox.size.h);
-        positioner.set_anchor_rect(bbox.loc.x, bbox.loc.y, bbox.size.w, bbox.size.h);
+        let popup_bbox = popup_element.bbox();
+        positioner.set_anchor_rect(loc.x, loc.y, bbox.size.w, bbox.size.h);
         let pixel_offset = 8;
         let (offset, anchor, gravity) = match self.config.anchor {
             PanelAnchor::Left => ((pixel_offset, 0), Anchor::Right, Gravity::Right),
@@ -90,6 +92,7 @@ impl PanelSpace {
         );
         positioner.set_offset(offset.0, offset.1);
 
+        positioner.set_size(popup_bbox.size.w, popup_bbox.size.h);
         let c_popup = popup::Popup::from_surface(
             None,
             &positioner,
@@ -97,7 +100,6 @@ impl PanelSpace {
             c_wl_surface.clone(),
             xdg_shell_state,
         )?;
-        let popup_bbox = popup_element.bbox();
 
         c_popup.xdg_surface().set_window_geometry(
             popup_bbox.loc.x,

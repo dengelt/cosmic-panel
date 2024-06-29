@@ -1,6 +1,9 @@
 use std::time::Duration;
 
-use crate::{iced::elements::CosmicMappedInternal, xdg_shell_wrapper::space::PanelPopup};
+use crate::{
+    iced::elements::{CosmicMappedInternal, PopupMappedInternal},
+    xdg_shell_wrapper::space::PanelPopup,
+};
 
 use super::{
     corner_element::{RoundedRectangleShader, RoundedRectangleShaderElement},
@@ -292,17 +295,23 @@ impl PanelSpace {
         }) {
             renderer.unbind()?;
             renderer.bind(p.egl_surface.as_ref().unwrap().clone())?;
-            let elements = match section {
-                OverflowSection::Center => self.overflow_center.elements(),
-                OverflowSection::Left => self.overflow_left.elements(),
-                OverflowSection::Right => self.overflow_right.elements(),
+            let space = match section {
+                OverflowSection::Center => &self.overflow_center,
+                OverflowSection::Left => &self.overflow_left,
+                OverflowSection::Right => &self.overflow_right,
             };
             let mut bg_render_element = None;
-            let elements: Vec<PanelRenderElement> = elements
+            let mut elements: Vec<PanelRenderElement> = space
+                .elements()
                 .filter_map(|e| match e {
-                    crate::iced::elements::PopupMappedInternal::Popup(_) => {
+                    crate::iced::elements::PopupMappedInternal::Popup(e) => {
                         // move to bg_render_element
-                        bg_render_element = Some(e);
+                        bg_render_element = Some(
+                            e.render_elements(renderer, (0, 0).into(), self.scale.into(), 1.0)
+                                .into_iter()
+                                .map(|r| PanelRenderElement::Iced(r))
+                                .collect::<Vec<_>>(),
+                        );
                         None
                     },
                     crate::iced::elements::PopupMappedInternal::Window(w) => {
@@ -310,9 +319,8 @@ impl PanelSpace {
                             return None;
                         };
 
-                        let loc = self
-                            .space
-                            .element_location(&CosmicMappedInternal::Window(w.clone()))
+                        let loc = space
+                            .element_location(&PopupMappedInternal::Window(w.clone()))
                             .unwrap_or_default()
                             .to_f64()
                             .to_physical(self.scale)
@@ -354,6 +362,8 @@ impl PanelSpace {
                 .flatten()
                 .collect();
 
+            elements.extend(bg_render_element.unwrap_or_default());
+
             _ = p.damage_tracked_renderer.render_output(
                 renderer,
                 p.egl_surface.as_ref().unwrap().buffer_age().unwrap_or_default() as usize,
@@ -362,7 +372,7 @@ impl PanelSpace {
             );
 
             p.egl_surface.as_ref().unwrap().swap_buffers(None)?;
-            let wl_surface = p.c_popup.wl_surface().clone();
+            let wl_surface = p.c_popup.wl_surface();
             wl_surface.frame(qh, wl_surface.clone());
             wl_surface.commit();
         }
