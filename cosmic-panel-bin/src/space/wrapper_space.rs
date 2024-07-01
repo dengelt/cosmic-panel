@@ -920,7 +920,7 @@ impl WrapperSpace for PanelSpace {
                 bbox.loc.x = render_location.x as f64;
                 bbox.loc.y = render_location.y as f64;
                 if bbox.contains((x as f64, y as f64)) {
-                    Some((bbox, w.into_owned(), render_location))
+                    Some((e.bbox().to_f64(), w.into_owned(), render_location))
                 } else {
                     None
                 }
