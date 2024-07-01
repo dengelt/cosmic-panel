@@ -48,7 +48,7 @@ use sctk::{
 };
 use shlex::Shlex;
 use smithay::{
-    backend::renderer::{damage::OutputDamageTracker, gles::GlesRenderer},
+    backend::renderer::{damage::OutputDamageTracker, element, gles::GlesRenderer},
     desktop::{
         space::SpaceElement, utils::bbox_from_surface_tree, PopupKind, PopupManager, Window,
     },
@@ -76,7 +76,7 @@ use crate::{
     },
 };
 
-use super::PanelSpace;
+use super::{layout::OverflowSection, PanelSpace};
 
 impl WrapperSpace for PanelSpace {
     type Config = CosmicPanelConfig;
@@ -800,6 +800,11 @@ impl WrapperSpace for PanelSpace {
             self.s_hovered_surface.iter_mut().enumerate().find(|(_, f)| f.seat_name == seat_name);
         let prev_foc = self.s_focused_surface.iter_mut().find(|f| f.1 == seat_name);
         // first check if the motion is on a popup's client surface
+
+        let mut cur_client_hover_id = None;
+        let mut hover_relative_loc = None;
+        let mut hover_geo = None;
+
         let ret = if let Some(p) =
             self.popups.iter().find(|p| p.popup.c_popup.wl_surface() == &c_wl_surface)
         {
@@ -827,23 +832,12 @@ impl WrapperSpace for PanelSpace {
                 });
                 self.s_hovered_surface.last().cloned()
             }
-        } else {
+        } else if self.layer.as_ref().is_some_and(|s| *s.wl_surface() == c_wl_surface) {
             // if not on this panel's client surface return None
-            if self.layer.as_ref().map(|s| *s.wl_surface() != c_wl_surface).unwrap_or(true) {
-                if self.space.elements().any(|e| {
-                    e.wl_surface()
-                        .zip(prev_hover.as_ref().map(|s| s.1.surface.wl_surface()))
-                        .is_some_and(|(s, prev_hover)| Some(s) == prev_hover)
-                }) {
-                    let (pos, _) = prev_hover.unwrap();
-                    self.s_hovered_surface.remove(pos);
-                }
-                self.generated_ptr_event_count = self.generated_ptr_event_count.saturating_sub(1);
-                return None;
-            }
+
             // FIXME
             // There has to be a way to avoid messing with the scaling like this...
-            if let Some((target, relative_loc)) = self.space.elements().rev().find_map(|e| {
+            let space_focus = self.space.elements().rev().find_map(|e| {
                 let Some(render_location) = self.space.element_location(e) else {
                     self.generated_ptr_event_count =
                         self.generated_ptr_event_count.saturating_sub(1);
@@ -860,7 +854,9 @@ impl WrapperSpace for PanelSpace {
                 } else {
                     None
                 }
-            }) {
+            });
+
+            if let Some((target, relative_loc)) = space_focus {
                 let geo =
                     target.bbox().to_f64().to_physical(1.0).to_logical(self.scale).to_i32_round();
                 if let Some(prev_kbd) = prev_foc {
@@ -869,118 +865,10 @@ impl WrapperSpace for PanelSpace {
                     self.s_focused_surface.push((target.clone().into(), seat_name.to_string()));
                 }
 
-                let prev_popup_client = self
-                    .popups
-                    .iter()
-                    .next()
-                    .and_then(|p| p.s_surface.wl_surface().client())
-                    .map(|c| c.id());
+                hover_geo = Some(geo);
+                hover_relative_loc = Some(relative_loc);
+                cur_client_hover_id = target.wl_surface().and_then(|t| t.client().map(|c| c.id()));
 
-                let cur_client_hover_id =
-                    target.wl_surface().and_then(|t| t.client().map(|c| c.id()));
-                if prev_popup_client.is_some()
-                    && prev_popup_client != cur_client_hover_id
-                    && self.generated_ptr_event_count == 0
-                {
-                    // send press to new client if it hover flag is set
-                    let left_guard = self.clients_left.lock().unwrap();
-                    let center_guard = self.clients_center.lock().unwrap();
-                    let right_guard = self.clients_right.lock().unwrap();
-
-                    if let Some(c) =
-                        left_guard.iter().chain(center_guard.iter()).chain(right_guard.iter()).find(
-                            |c| {
-                                c.auto_popup_hover_press.is_some()
-                                    && Some(c.client.id()) == cur_client_hover_id
-                            },
-                        )
-                    {
-                        let mut p = (x, y);
-                        let effective_anchor = match (
-                            c.auto_popup_hover_press.unwrap(),
-                            self.config.is_horizontal(),
-                        ) {
-                            (AppletAutoClickAnchor::Start, true) => AppletAutoClickAnchor::Left,
-                            (AppletAutoClickAnchor::Start, false) => AppletAutoClickAnchor::Top,
-                            (AppletAutoClickAnchor::End, true) => AppletAutoClickAnchor::Right,
-                            (AppletAutoClickAnchor::End, false) => AppletAutoClickAnchor::Bottom,
-                            (anchor, _) => anchor,
-                        };
-                        match effective_anchor {
-                            AppletAutoClickAnchor::Top => {
-                                // centered on the top edge
-                                p.0 = relative_loc.x + geo.size.w as i32 / 2;
-                                p.1 = relative_loc.y + 4;
-                            },
-                            AppletAutoClickAnchor::Bottom => {
-                                // centered on the bottom edge
-                                p.0 = relative_loc.x + geo.size.w as i32 / 2;
-                                p.1 = relative_loc.y + geo.size.h as i32 - 4;
-                            },
-                            AppletAutoClickAnchor::Left => {
-                                // centered on the left edge
-                                p.0 = relative_loc.x + 4;
-                                p.1 = relative_loc.y + geo.size.h as i32 / 2;
-                            },
-                            AppletAutoClickAnchor::Right => {
-                                // centered on the right edge
-                                p.0 = relative_loc.x + geo.size.w as i32 - 4;
-                                p.1 = relative_loc.y + geo.size.h as i32 / 2;
-                            },
-                            AppletAutoClickAnchor::Center => {
-                                // centered on the center
-                                p.0 = relative_loc.x + geo.size.w as i32 / 2;
-                                p.1 = relative_loc.y + geo.size.h as i32 / 2;
-                            },
-                            AppletAutoClickAnchor::Auto => {
-                                let relative_x = x - relative_loc.x;
-                                let relative_y = y - relative_loc.y;
-                                if relative_x.abs() < 4 {
-                                    p.0 += 4;
-                                } else if (relative_x - geo.size.w as i32).abs() < 4 {
-                                    p.0 -= 4;
-                                }
-                                if relative_y.abs() < 4 {
-                                    p.1 += 4;
-                                } else if (relative_y - geo.size.h as i32).abs() < 4 {
-                                    p.1 -= 4;
-                                }
-                            },
-                            AppletAutoClickAnchor::Start | AppletAutoClickAnchor::End => {
-                                tracing::warn!("Invalid anchor for auto click");
-                                // should be handled above
-                            },
-                        }
-
-                        self.generated_pointer_events = vec![
-                            PointerEvent {
-                                surface: self.layer.as_ref().unwrap().wl_surface().clone(),
-                                position: (p.0 as f64, p.1 as f64),
-                                kind: sctk::seat::pointer::PointerEventKind::Motion { time: 0 },
-                            },
-                            PointerEvent {
-                                surface: self.layer.as_ref().unwrap().wl_surface().clone(),
-                                position: (p.0 as f64, p.1 as f64),
-                                kind: sctk::seat::pointer::PointerEventKind::Press {
-                                    time: 0,
-                                    button: BTN_LEFT,
-                                    serial: 0,
-                                },
-                            },
-                            PointerEvent {
-                                surface: self.layer.as_ref().unwrap().wl_surface().clone(),
-                                position: (p.0 as f64, p.1 as f64),
-                                kind: sctk::seat::pointer::PointerEventKind::Release {
-                                    time: 0,
-                                    button: BTN_LEFT,
-                                    serial: 0,
-                                },
-                            },
-                        ];
-                    }
-                } else if prev_popup_client.is_some() && self.generated_ptr_event_count == 0 {
-                    // TODO simulate button press on the overflow button...
-                }
                 if let Some((_, prev_foc)) = prev_hover.as_mut() {
                     prev_foc.s_pos = relative_loc.to_f64();
                     prev_foc.c_pos = geo.loc;
@@ -1001,7 +889,204 @@ impl WrapperSpace for PanelSpace {
                 }
                 None
             }
+        } else if self
+            .overflow_popup
+            .as_ref()
+            .is_some_and(|p| p.0.c_popup.wl_surface() == &c_wl_surface)
+        {
+            let (popup, section) = self.overflow_popup.as_ref().unwrap();
+            let space = match section {
+                OverflowSection::Left => &self.overflow_left,
+                OverflowSection::Center => &self.overflow_center,
+                OverflowSection::Right => &self.overflow_right,
+            };
+
+            let space_focus = space.elements().rev().find_map(|e| {
+                let Some(w) = (match e {
+                    PopupMappedInternal::Window(w) => w.wl_surface(),
+                    _ => return None,
+                }) else {
+                    return None;
+                };
+                let Some(render_location) = space.element_location(e) else {
+                    self.generated_ptr_event_count =
+                        self.generated_ptr_event_count.saturating_sub(1);
+                    return None;
+                };
+
+                let mut bbox = e.bbox().to_f64();
+                bbox.size.w /= popup.scale;
+                bbox.size.h /= popup.scale;
+                bbox.loc.x = render_location.x as f64;
+                bbox.loc.y = render_location.y as f64;
+                if bbox.contains((x as f64, y as f64)) {
+                    Some((bbox, w.into_owned(), render_location))
+                } else {
+                    None
+                }
+            });
+
+            if let Some((bbox, target, relative_loc)) = space_focus {
+                let geo = bbox.to_physical(1.0).to_logical(self.scale).to_i32_round();
+                if let Some(prev_kbd) = prev_foc {
+                    prev_kbd.0 = SpaceTarget::Surface(target.clone());
+                } else {
+                    self.s_focused_surface.push((target.clone().into(), seat_name.to_string()));
+                }
+
+                hover_geo = Some(geo);
+                hover_relative_loc = Some(relative_loc);
+                cur_client_hover_id = target.wl_surface().and_then(|t| t.client().map(|c| c.id()));
+
+                if let Some((_, prev_foc)) = prev_hover.as_mut() {
+                    prev_foc.s_pos = relative_loc.to_f64();
+                    prev_foc.c_pos = geo.loc;
+                    prev_foc.surface = target.into();
+                    Some(prev_foc.clone())
+                } else {
+                    self.s_hovered_surface.push(ServerPointerFocus {
+                        surface: target.into(),
+                        seat_name: seat_name.to_string(),
+                        c_pos: geo.loc,
+                        s_pos: relative_loc.to_f64(),
+                    });
+                    self.s_hovered_surface.last().cloned()
+                }
+            } else {
+                if let Some((prev_i, _)) = prev_hover {
+                    self.s_hovered_surface.swap_remove(prev_i);
+                }
+                None
+            }
+        } else {
+            if self
+                .space
+                .elements()
+                .filter_map(|e| e.wl_surface())
+                .chain(self.overflow_left.elements().filter_map(|e| e.wl_surface()))
+                .any(|e| {
+                    e.wl_surface()
+                        .zip(prev_hover.as_ref().map(|s| s.1.surface.wl_surface()))
+                        .is_some_and(|(s, prev_hover)| Some(s) == prev_hover)
+                })
+            {
+                let (pos, _) = prev_hover.unwrap();
+                self.s_hovered_surface.remove(pos);
+            }
+            self.generated_ptr_event_count = self.generated_ptr_event_count.saturating_sub(1);
+            return None;
         };
+
+        let prev_popup_client = self
+            .popups
+            .iter()
+            .next()
+            .and_then(|p| p.s_surface.wl_surface().client())
+            .map(|c| c.id());
+
+        if prev_popup_client.is_some()
+            && prev_popup_client != cur_client_hover_id
+            && self.generated_ptr_event_count == 0
+        {
+            // send press to new client if it hover flag is set
+            let left_guard = self.clients_left.lock().unwrap();
+            let center_guard = self.clients_center.lock().unwrap();
+            let right_guard = self.clients_right.lock().unwrap();
+
+            if let Some(((c, relative_loc), geo)) = left_guard
+                .iter()
+                .chain(center_guard.iter())
+                .chain(right_guard.iter())
+                .find(|c| {
+                    c.auto_popup_hover_press.is_some() && Some(c.client.id()) == cur_client_hover_id
+                })
+                .zip(hover_relative_loc)
+                .zip(hover_geo)
+            {
+                let mut p = (x, y);
+                let effective_anchor =
+                    match (c.auto_popup_hover_press.unwrap(), self.config.is_horizontal()) {
+                        (AppletAutoClickAnchor::Start, true) => AppletAutoClickAnchor::Left,
+                        (AppletAutoClickAnchor::Start, false) => AppletAutoClickAnchor::Top,
+                        (AppletAutoClickAnchor::End, true) => AppletAutoClickAnchor::Right,
+                        (AppletAutoClickAnchor::End, false) => AppletAutoClickAnchor::Bottom,
+                        (anchor, _) => anchor,
+                    };
+                match effective_anchor {
+                    AppletAutoClickAnchor::Top => {
+                        // centered on the top edge
+                        p.0 = relative_loc.x + geo.size.w as i32 / 2;
+                        p.1 = relative_loc.y + 4;
+                    },
+                    AppletAutoClickAnchor::Bottom => {
+                        // centered on the bottom edge
+                        p.0 = relative_loc.x + geo.size.w as i32 / 2;
+                        p.1 = relative_loc.y + geo.size.h as i32 - 4;
+                    },
+                    AppletAutoClickAnchor::Left => {
+                        // centered on the left edge
+                        p.0 = relative_loc.x + 4;
+                        p.1 = relative_loc.y + geo.size.h as i32 / 2;
+                    },
+                    AppletAutoClickAnchor::Right => {
+                        // centered on the right edge
+                        p.0 = relative_loc.x + geo.size.w as i32 - 4;
+                        p.1 = relative_loc.y + geo.size.h as i32 / 2;
+                    },
+                    AppletAutoClickAnchor::Center => {
+                        // centered on the center
+                        p.0 = relative_loc.x + geo.size.w as i32 / 2;
+                        p.1 = relative_loc.y + geo.size.h as i32 / 2;
+                    },
+                    AppletAutoClickAnchor::Auto => {
+                        let relative_x = x - relative_loc.x;
+                        let relative_y = y - relative_loc.y;
+                        if relative_x.abs() < 4 {
+                            p.0 += 4;
+                        } else if (relative_x - geo.size.w as i32).abs() < 4 {
+                            p.0 -= 4;
+                        }
+                        if relative_y.abs() < 4 {
+                            p.1 += 4;
+                        } else if (relative_y - geo.size.h as i32).abs() < 4 {
+                            p.1 -= 4;
+                        }
+                    },
+                    AppletAutoClickAnchor::Start | AppletAutoClickAnchor::End => {
+                        tracing::warn!("Invalid anchor for auto click");
+                        // should be handled above
+                    },
+                }
+
+                self.generated_pointer_events = vec![
+                    PointerEvent {
+                        surface: self.layer.as_ref().unwrap().wl_surface().clone(),
+                        position: (p.0 as f64, p.1 as f64),
+                        kind: sctk::seat::pointer::PointerEventKind::Motion { time: 0 },
+                    },
+                    PointerEvent {
+                        surface: self.layer.as_ref().unwrap().wl_surface().clone(),
+                        position: (p.0 as f64, p.1 as f64),
+                        kind: sctk::seat::pointer::PointerEventKind::Press {
+                            time: 0,
+                            button: BTN_LEFT,
+                            serial: 0,
+                        },
+                    },
+                    PointerEvent {
+                        surface: self.layer.as_ref().unwrap().wl_surface().clone(),
+                        position: (p.0 as f64, p.1 as f64),
+                        kind: sctk::seat::pointer::PointerEventKind::Release {
+                            time: 0,
+                            button: BTN_LEFT,
+                            serial: 0,
+                        },
+                    },
+                ];
+            }
+        } else if prev_popup_client.is_some() && self.generated_ptr_event_count == 0 {
+            // TODO simulate button press on the overflow button...
+        }
         self.generated_ptr_event_count = self.generated_ptr_event_count.saturating_sub(1);
         ret
     }

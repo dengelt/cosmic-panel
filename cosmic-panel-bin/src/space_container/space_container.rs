@@ -16,7 +16,8 @@ use crate::{
 };
 use cctk::{
     cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1::ZcosmicToplevelHandleV1,
-    toplevel_info::ToplevelInfo, workspace::WorkspaceGroup,
+    toplevel_info::ToplevelInfo, wayland_client::protocol::wl_seat::WlSeat,
+    workspace::WorkspaceGroup,
 };
 use cosmic::{cosmic_config::CosmicConfigEntry, iced::id, theme};
 use cosmic_panel_config::{
@@ -500,6 +501,7 @@ impl SpaceContainer {
         viewport: Option<&ViewporterState>,
         qh: &QueueHandle<GlobalState>,
         xdg_shell_state: &mut sctk::shell::xdg::XdgShell,
+        seat: (u32, WlSeat),
     ) {
         for space in &mut self.space_list {
             if space.space.id() == panel_id {
@@ -510,6 +512,7 @@ impl SpaceContainer {
                     viewport,
                     qh,
                     xdg_shell_state,
+                    seat,
                 ) {
                     error!("Failed to toggle overflow popup: {}", err);
                 }

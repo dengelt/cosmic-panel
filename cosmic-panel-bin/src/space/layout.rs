@@ -12,6 +12,7 @@ use crate::{
     },
     minimize::MinimizeApplet,
     space::{corner_element::RoundedRectangleSettings, Alignment},
+    xdg_shell_wrapper::space,
 };
 
 use super::{panel_space::PanelClient, PanelSpace};
@@ -652,25 +653,59 @@ impl PanelSpace {
 
     // reorder overflow space windows, and remove dead windows
     fn reorder_overflow_space(&mut self, section: OverflowSection) {
-        let space = match section {
-            OverflowSection::Left => &mut self.overflow_left,
-            OverflowSection::Center => &mut self.overflow_center,
-            OverflowSection::Right => &mut self.overflow_right,
+        let (space, clients) = match section {
+            OverflowSection::Left => (&mut self.overflow_left, self.clients_left.lock().unwrap()),
+            OverflowSection::Center => {
+                (&mut self.overflow_center, self.clients_center.lock().unwrap())
+            },
+            OverflowSection::Right => {
+                (&mut self.overflow_right, self.clients_right.lock().unwrap())
+            },
         };
 
         let mut overflow_cnt = 0;
-        for e in space.elements().cloned().collect_vec() {
+        let mut elements = space.elements().cloned().collect_vec();
+        elements.sort_by(|a, b| {
+            // sort by position in client list
+            let pos_a = clients.iter().position(|c| {
+                if let PopupMappedInternal::Window(w) = a {
+                    w.toplevel().is_some_and(|t| {
+                        t.wl_surface().client().is_some_and(|w_client| w_client == c.client)
+                    })
+                } else {
+                    false
+                }
+            });
+            let pos_b = clients.iter().position(|c| {
+                if let PopupMappedInternal::Window(w) = b {
+                    w.toplevel().is_some_and(|t| {
+                        t.wl_surface().client().is_some_and(|w_client| w_client == c.client)
+                    })
+                } else {
+                    false
+                }
+            });
+            pos_a.cmp(&pos_b)
+        });
+
+        for e in elements {
             match &e {
                 PopupMappedInternal::Window(w) => {
                     if !w.alive() {
                         space.unmap_elem(&PopupMappedInternal::Window(w.clone()));
                     } else {
-                        overflow_cnt += 1;
                         let applet_size_unit =
                             self.config.size.get_applet_icon_size_with_padding(true);
-                        let x = (overflow_cnt % 8) as i32 * applet_size_unit as i32;
-                        let y = (overflow_cnt / 8) as i32 * applet_size_unit as i32;
+                        let x_i = (overflow_cnt % 8) as i32;
+                        let padding = self.config.padding as i32;
+                        let spacing = self.config.spacing as i32;
+                        let x = padding
+                            + x_i as i32 * applet_size_unit as i32
+                            + (x_i.saturating_sub(1) * spacing);
+                        let y = padding
+                            + (overflow_cnt / 8) as i32 * (applet_size_unit as i32 + spacing);
                         space.map_element(e, (x, y), false);
+                        overflow_cnt += 1;
                     }
                 },
                 _ => (),
@@ -821,13 +856,15 @@ impl PanelSpace {
             {
                 continue;
             }
-            dbg!(bbox.size.w, bbox.size.h);
-            overflow_cnt += 1;
             let diff = if is_horizontal { bbox.size.w as u32 } else { bbox.size.h as u32 };
             overflow = overflow.saturating_sub(diff);
+            let padding = self.config.padding as i32;
+            let spacing = self.config.spacing;
             // TODO spacing & padding
-            let x = (overflow_cnt % 8) as i32 * applet_size_unit as i32;
-            let y = (overflow_cnt / 8) as i32 * applet_size_unit as i32;
+            let x_i = (overflow_cnt % 8) as i32;
+            let x =
+                padding + x_i * applet_size_unit as i32 + (x_i.saturating_sub(1)) * spacing as i32;
+            let y = 30 + (overflow_cnt / 8) as i32 * (applet_size_unit + spacing) as i32;
 
             space.unmap_elem(&CosmicMappedInternal::Window(w.0.clone()));
             // Rows of 8 with configured applet size
@@ -838,17 +875,22 @@ impl PanelSpace {
                 t.send_pending_configure();
             }
             overflow_space.map_element(PopupMappedInternal::Window(w.0), (x, y), true);
+            overflow_cnt += 1;
         }
         overflow_space.refresh();
+        let overflow_cnt = overflow_space
+            .elements()
+            .filter(|e| if let PopupMappedInternal::Window(w) = e { w.alive() } else { false })
+            .count();
+
         let space = self.config.spacing as f32;
         let padding = self.config.padding as f32;
-        dbg!(overflow_cnt);
-        dbg!(overflow_space.elements().count());
         let popup_major = overflow_cnt.min(8) as f32 * applet_size_unit as f32
             + 2. * padding
-            + (overflow_cnt.saturating_sub(1) as f32) * space;
-        let popup_cross = (overflow_cnt as f32 / 8.).ceil().min(1.0) * applet_size_unit as f32;
-        dbg!(popup_cross);
+            + (overflow_cnt.min(8).saturating_sub(1) as f32) * space;
+        let popup_cross = (overflow_cnt as f32 / 8.).ceil().min(1.0) * applet_size_unit as f32
+            + 2. * padding
+            + ((overflow_cnt / 8).saturating_sub(1)) as f32 * space;
         let popup = overflow_space
             .elements()
             .find(|e| {
@@ -921,8 +963,12 @@ impl PanelSpace {
             self.is_dirty = true;
             self.space.refresh();
         } else if let Some(overflow_popup) = popup {
+            let e = new_popup();
+            let output = self.output.as_ref().map(|o| &o.1).unwrap();
+
+            e.output_enter(output, Default::default());
             overflow_space.unmap_elem(&overflow_popup);
-            overflow_space.map_element(new_popup(), (0, 0), false);
+            overflow_space.map_element(e, (0, 0), false);
         }
 
         overflow

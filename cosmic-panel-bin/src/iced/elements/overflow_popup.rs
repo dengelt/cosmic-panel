@@ -2,7 +2,10 @@
 
 use calloop::LoopHandle;
 use cosmic::{
-    iced::{id, Length},
+    iced::{id, Color, Length},
+    iced_core::Shadow,
+    iced_style::container,
+    theme,
     widget::horizontal_space,
     Theme,
 };
@@ -48,7 +51,21 @@ impl Program for OverflowPopup {
             cosmic::widget::container(horizontal_space(Length::Fixed(self.logical_width)))
                 .width(Length::Fixed(self.logical_width))
                 .height(Length::Fixed(self.logical_height))
-                .style(cosmic::theme::Container::WindowBackground),
+                .style(theme::Container::custom(|theme| {
+                    let cosmic = theme.cosmic();
+                    let corners = cosmic.corner_radii.clone();
+                    container::Appearance {
+                        text_color: Some(cosmic.background.on.into()),
+                        background: Some(Color::from(cosmic.background.base).into()),
+                        border: cosmic::iced::Border {
+                            radius: corners.radius_m.into(),
+                            width: 1.0,
+                            color: cosmic.background.divider.into(),
+                        },
+                        shadow: Shadow::default(),
+                        icon_color: Some(cosmic.background.on.into()),
+                    }
+                })),
         )
     }
 }

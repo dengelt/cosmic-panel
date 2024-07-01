@@ -9,7 +9,7 @@ use cctk::{
             XdgPositioner,
         },
     },
-    wayland_client::{Proxy, QueueHandle},
+    wayland_client::{protocol::wl_seat::WlSeat, Proxy, QueueHandle},
 };
 use cosmic::iced::id;
 
@@ -55,6 +55,7 @@ impl PanelSpace {
         viewport: Option<&ViewporterState>,
         qh: &QueueHandle<GlobalState>,
         xdg_shell_state: &mut sctk::shell::xdg::XdgShell,
+        seat: (u32, WlSeat),
     ) -> anyhow::Result<()> {
         self.popups.clear();
         if self.overflow_popup.is_some() {
@@ -100,6 +101,8 @@ impl PanelSpace {
             c_wl_surface.clone(),
             xdg_shell_state,
         )?;
+
+        c_popup.xdg_popup().grab(&seat.1, seat.0);
 
         c_popup.xdg_surface().set_window_geometry(
             popup_bbox.loc.x,
