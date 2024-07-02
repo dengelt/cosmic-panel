@@ -186,14 +186,14 @@ impl PanelSpace {
                                         renderer,
                                         t.wl_surface(),
                                         loc,
-                                        self.scale,
+                                        1.0,
                                         1.0,
                                         smithay::backend::renderer::element::Kind::Unspecified,
                                     )
                                     .into_iter()
                                     .map(|r: WaylandSurfaceRenderElement<GlesRenderer>| {
                                         let mut src = r.src();
-                                        let mut geo = r.geometry(self.scale.into());
+                                        let mut geo = r.geometry(1.0.into());
                                         if let Some(size) = t.current_state().size {
                                             let scaled_size = size
                                                 .to_f64()
@@ -330,14 +330,14 @@ impl PanelSpace {
                                 renderer,
                                 t.wl_surface(),
                                 loc,
-                                self.scale,
+                                1.0,
                                 1.0,
                                 smithay::backend::renderer::element::Kind::Unspecified,
                             )
                             .into_iter()
                             .map(|r: WaylandSurfaceRenderElement<GlesRenderer>| {
                                 let mut src = r.src();
-                                let mut geo = r.geometry(self.scale.into());
+                                let mut geo = r.geometry(1.0.into());
                                 if let Some(size) = t.current_state().size {
                                     let scaled_size = size
                                         .to_f64()
