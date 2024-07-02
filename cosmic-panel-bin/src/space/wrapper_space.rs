@@ -1,7 +1,7 @@
 use std::{
     cell::{Cell, RefCell},
     ffi::OsString,
-    fs,
+    fs, mem,
     os::{fd::OwnedFd, unix::prelude::AsRawFd},
     rc::Rc,
     sync::{Arc, Mutex},
@@ -137,13 +137,17 @@ impl WrapperSpace for PanelSpace {
         tracing::info!("adding popup");
         self.apply_positioner_state(&positioner, positioner_state, &s_surface);
         let c_wl_surface = compositor_state.create_surface(qh);
-        let mut clear_overflow: bool = true;
+        let mut clear_exclude = Vec::new();
+        let mut parent_parents = Vec::new();
+
         let parent = self
             .popups
             .iter()
             .find_map(|p| {
                 if s_surface.get_parent_surface().is_some_and(|s| &s == p.s_surface.wl_surface()) {
-                    Some(p.popup.c_popup.xdg_surface().clone())
+                    clear_exclude.push(p.popup.c_popup.clone());
+                    parent_parents.push(p.popup.parent.clone());
+                    Some(p.popup.c_popup.clone())
                 } else {
                     None
                 }
@@ -165,20 +169,29 @@ impl WrapperSpace for PanelSpace {
                         false
                     }
                 }) {
-                    clear_overflow = false;
-                    Some(p.c_popup.xdg_surface().clone())
+                    clear_exclude.push(p.c_popup.clone());
+                    parent_parents.push(p.parent.clone());
+                    Some(p.c_popup.clone())
                 } else {
                     None
                 }
             });
-        if clear_overflow {
-            tracing::info!("clearing overflow popup.");
-            self.overflow_popup = None;
-        } else {
-            tracing::info!("not clearing overflow popup.");
+
+        // TODO maybe extract this to a function if it's needed elsewhere
+        while !parent_parents.is_empty() {
+            for p in
+                self.popups.iter().map(|p| &p.popup).chain(self.overflow_popup.iter().map(|p| &p.0))
+            {
+                for w in mem::take(&mut parent_parents) {
+                    if &w == p.c_popup.wl_surface() {
+                        parent_parents.push(p.parent.clone());
+                    }
+                }
+            }
         }
+        self.close_popups(clear_exclude);
         let c_popup = popup::Popup::from_surface(
-            parent.as_ref(),
+            parent.as_ref().map(|p| p.xdg_surface()),
             &positioner,
             qh,
             c_wl_surface.clone(),
@@ -259,6 +272,9 @@ impl WrapperSpace for PanelSpace {
                 fractional_scale,
                 viewport,
                 scale: self.scale,
+                parent: parent
+                    .map(|p| p.wl_surface().clone())
+                    .unwrap_or(self.layer.as_ref().unwrap().wl_surface().clone()),
             },
             s_surface,
         });
@@ -800,11 +816,8 @@ impl WrapperSpace for PanelSpace {
                 .map(|(i, f)| (i, f.0.clone()))
         } {
             // close popups when panel is pressed
-            if self.layer.as_ref().map(|s| s.wl_surface()) == Some(&prev_foc.1)
-                && !self.popups.is_empty()
-                && press
-            {
-                self.close_popups();
+            if self.layer.as_ref().map(|s| s.wl_surface()) == Some(&prev_foc.1) && press {
+                self.close_popups([]);
             }
             self.s_hovered_surface.iter().find_map(|h| {
                 if h.seat_name.as_str() == seat_name {
@@ -814,6 +827,9 @@ impl WrapperSpace for PanelSpace {
                 }
             })
         } else {
+            if press {
+                self.close_popups([]);
+            }
             // no hover found
             // if has keyboard focus remove it and close popups
             self.keyboard_leave(seat_name, None);
@@ -1036,7 +1052,7 @@ impl WrapperSpace for PanelSpace {
 
         if prev_popup_client.is_some() && matches!(cur_client_hover_id, Some(HoverId::Overflow(_)))
         {
-            self.close_popups();
+            self.close_popups([]);
             if let Some((relative_loc, geo)) = hover_relative_loc.zip(hover_geo) {
                 // place in center
                 let mut p = (x, y);
@@ -1185,7 +1201,7 @@ impl WrapperSpace for PanelSpace {
     fn keyboard_leave(&mut self, seat_name: &str, _: Option<c_wl_surface::WlSurface>) {
         self.s_focused_surface.retain(|(_, name)| name != seat_name);
 
-        self.close_popups();
+        self.close_popups([]);
     }
 
     fn keyboard_enter(&mut self, _: &str, _: c_wl_surface::WlSurface) -> Option<s_WlSurface> {

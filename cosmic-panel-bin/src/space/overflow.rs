@@ -14,6 +14,7 @@ use cctk::{
 use cosmic::iced::id;
 
 use cosmic_panel_config::PanelAnchor;
+use sctk::shell::WaylandSurface;
 use smithay::{
     backend::{
         egl::EGLSurface,
@@ -148,6 +149,7 @@ impl PanelSpace {
                 viewport,
                 scale: self.scale,
                 input_region: None,
+                parent: self.layer.as_ref().unwrap().wl_surface().clone(),
             },
             section,
         ));

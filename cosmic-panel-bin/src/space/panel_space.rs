@@ -544,7 +544,7 @@ impl PanelSpace {
                             );
                             layer_shell_wl_surface.commit();
                         }
-                        self.close_popups();
+                        self.close_popups([]);
                         self.visibility = Visibility::TransitionToHidden {
                             last_instant: now,
                             progress,
@@ -571,7 +571,7 @@ impl PanelSpace {
 
                 if let FocusStatus::LastFocused(_) = cur_hover {
                     // start transition to visible
-                    self.close_popups();
+                    self.close_popups([]);
                     self.visibility = Visibility::TransitionToHidden {
                         last_instant: now,
                         progress: total_t.checked_sub(progress).unwrap_or_default(),

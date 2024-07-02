@@ -2,39 +2,38 @@ use std::rc::Rc;
 
 use crate::xdg_shell_wrapper::space::{ClientEglSurface, WrapperPopupState};
 use cctk::wayland_client::Proxy;
-use sctk::shell::xdg::popup;
+use sctk::shell::xdg::popup::{self, Popup};
 use smithay::{
     backend::{egl::EGLSurface, renderer::gles::GlesRenderer},
     desktop::{PopupKind, PopupManager},
     utils::Rectangle,
-    wayland::seat::WaylandFocus,
 };
 use wayland_egl::WlEglSurface;
 
 use super::PanelSpace;
 
 impl PanelSpace {
-    pub(crate) fn close_popups(&mut self) {
+    pub(crate) fn close_popups<'a>(&mut self, exclude: impl AsRef<[Popup]>) {
         tracing::info!("Closing popups");
-        for t in &mut self.space.elements().filter_map(|w| w.toplevel()) {
-            for (p, _) in PopupManager::popups_for_surface(t.wl_surface()) {
-                match p {
-                    PopupKind::Xdg(p) => {
-                        if !self.s_hovered_surface.iter().any(|hs| {
-                            hs.surface.wl_surface().is_some_and(|s| s.as_ref() == t.wl_surface())
-                        }) {
-                            p.send_popup_done();
-                        }
-                    },
-                    PopupKind::InputMethod(_) => {
-                        // TODO handle IME
-                        continue;
-                    },
-                }
+        let exclude = exclude.as_ref();
+
+        self.popups.retain_mut(|p| {
+            if exclude.iter().any(|e| e == &p.popup.c_popup) {
+                return true;
             }
+
+            tracing::info!("Closing popup: {:?}", p.popup.c_popup.wl_surface());
+            p.s_surface.send_popup_done();
+            p.popup.c_popup.xdg_popup().destroy();
+            p.popup.c_popup.wl_surface().destroy();
+            false
+        });
+        if self.overflow_popup.as_ref().is_some_and(|(p, _)| !exclude.contains(&p.c_popup)) {
+            let (popup, _) = self.overflow_popup.take().unwrap();
+            tracing::info!("Closing overflow popup: {:?}", popup.c_popup.wl_surface());
+            popup.c_popup.xdg_popup().destroy();
+            popup.c_popup.wl_surface().destroy();
         }
-        self.popups.clear();
-        self.overflow_popup = None;
     }
 
     pub fn configure_panel_popup(
