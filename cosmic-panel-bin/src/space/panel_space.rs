@@ -1143,9 +1143,26 @@ impl PanelSpace {
             s_surface.get_parent_surface().is_some_and(|s| &s == p.s_surface.wl_surface())
         }) {
             p.popup.rectangle.loc
+        } else if let Some(p) = self.overflow_popup.as_ref().and_then(|(_, section)| {
+            let space = match section {
+                OverflowSection::Left => &self.overflow_left,
+                OverflowSection::Center => &self.overflow_center,
+                OverflowSection::Right => &self.overflow_right,
+            };
+            space
+                .elements()
+                .find(|w| {
+                    s_surface
+                        .get_parent_surface()
+                        .is_some_and(|s| w.wl_surface().is_some_and(|w| w.as_ref() == &s))
+                })
+                .map(|w| space.element_location(w).unwrap_or_else(|| (0, 0).into()))
+        }) {
+            p
         } else {
-            return;
-        }; // TODO check overflow popup spaces too
+            tracing::warn!("No parent surface found for popup");
+            (0, 0).into()
+        };
 
         positioner.set_size(rect_size.w.max(1), rect_size.h.max(1));
         positioner.set_anchor_rect(

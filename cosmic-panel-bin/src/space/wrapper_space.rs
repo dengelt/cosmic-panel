@@ -172,11 +172,9 @@ impl WrapperSpace for PanelSpace {
                 }
             });
         if clear_overflow {
-            dbg!(parent.as_ref());
             tracing::info!("clearing overflow popup.");
             self.overflow_popup = None;
         } else {
-            dbg!(parent.as_ref());
             tracing::info!("not clearing overflow popup.");
         }
         let c_popup = popup::Popup::from_surface(
