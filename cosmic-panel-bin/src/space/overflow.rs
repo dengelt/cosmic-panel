@@ -58,7 +58,7 @@ impl PanelSpace {
         seat: (u32, WlSeat),
         force_hide: bool,
     ) -> anyhow::Result<()> {
-        if self.overflow_popup.is_some() {
+        if force_hide || self.overflow_popup.is_some() {
             tracing::info!("removing overflow popup");
             self.overflow_popup = None;
             return Ok(());

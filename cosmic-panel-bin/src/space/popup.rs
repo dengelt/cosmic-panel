@@ -15,6 +15,7 @@ use super::PanelSpace;
 
 impl PanelSpace {
     pub(crate) fn close_popups(&mut self) {
+        tracing::info!("Closing popups");
         for t in &mut self.space.elements().filter_map(|w| w.toplevel()) {
             for (p, _) in PopupManager::popups_for_surface(t.wl_surface()) {
                 match p {
@@ -39,7 +40,7 @@ impl PanelSpace {
     pub fn configure_panel_popup(
         &mut self,
         popup: &sctk::shell::xdg::popup::Popup,
-        config: sctk::shell::xdg::popup::PopupConfigure,
+        mut config: sctk::shell::xdg::popup::PopupConfigure,
         renderer: Option<&mut GlesRenderer>,
     ) {
         let Some(renderer) = renderer else {
@@ -53,11 +54,17 @@ impl PanelSpace {
             .chain(self.overflow_popup.iter_mut().map(|p| (&mut p.0, None)))
             .find(|(p, _)| popup.wl_surface() == p.c_popup.wl_surface())
         {
-            // use the size that we have already
-            p.wrapper_rectangle =
-                Rectangle::from_loc_and_size(config.position, (config.width, config.height));
-
+            tracing::info!("Configuring popup: {:?}", config);
+            // use the size that we have already if the new size is 0
+            if config.width == 0 {
+                config.width = p.wrapper_rectangle.size.w;
+            }
+            if config.height == 0 {
+                config.height = p.wrapper_rectangle.size.h;
+            }
             let (width, height) = (config.width, config.height);
+            p.wrapper_rectangle = Rectangle::from_loc_and_size(config.position, (width, height));
+
             p.state = match p.state {
                 None | Some(WrapperPopupState::WaitConfigure) => None,
                 Some(r) => Some(r),
@@ -69,10 +76,14 @@ impl PanelSpace {
 
             match config.kind {
                 popup::ConfigureKind::Initial => {
+                    tracing::info!("Popup Initial Configure");
                     let wl_egl_surface =
                         match WlEglSurface::new(p.c_popup.wl_surface().id(), width, height) {
                             Ok(s) => s,
-                            Err(_) => return,
+                            Err(err) => {
+                                tracing::error!("Failed to create WlEglSurface: {:?}", err);
+                                return;
+                            },
                         };
                     let client_egl_surface = unsafe {
                         ClientEglSurface::new(wl_egl_surface, p.c_popup.wl_surface().clone())
@@ -91,6 +102,7 @@ impl PanelSpace {
                     });
                     p.egl_surface.replace(egl_surface);
                     p.dirty = true;
+                    tracing::info!("Popup configured");
                 },
                 popup::ConfigureKind::Reactive => {},
                 popup::ConfigureKind::Reposition { token: _token } => {},

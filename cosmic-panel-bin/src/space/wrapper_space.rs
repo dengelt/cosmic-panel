@@ -137,18 +137,50 @@ impl WrapperSpace for PanelSpace {
         tracing::info!("adding popup");
         self.apply_positioner_state(&positioner, positioner_state, &s_surface);
         let c_wl_surface = compositor_state.create_surface(qh);
-
-        let parent = self.popups.iter().find_map(|p| {
-            if s_surface.get_parent_surface().is_some_and(|s| &s == p.s_surface.wl_surface()) {
-                Some(p.popup.c_popup.xdg_surface())
-            } else {
-                None
-            }
-        });
-        self.overflow_popup = None;
-
+        let mut clear_overflow: bool = true;
+        let parent = self
+            .popups
+            .iter()
+            .find_map(|p| {
+                if s_surface.get_parent_surface().is_some_and(|s| &s == p.s_surface.wl_surface()) {
+                    Some(p.popup.c_popup.xdg_surface().clone())
+                } else {
+                    None
+                }
+            })
+            .or_else(|| {
+                let (p, space) = match self.overflow_popup.as_ref() {
+                    Some((p, OverflowSection::Left)) => (p, &self.overflow_left),
+                    Some((p, OverflowSection::Center)) => (p, &self.overflow_center),
+                    Some((p, OverflowSection::Right)) => (p, &self.overflow_right),
+                    _ => return None,
+                };
+                if space.elements().any(|e| {
+                    if let PopupMappedInternal::Window(w) = e {
+                        s_surface
+                            .get_parent_surface()
+                            .zip(w.wl_surface())
+                            .is_some_and(|(a, b)| &a == b.as_ref())
+                    } else {
+                        false
+                    }
+                }) {
+                    clear_overflow = false;
+                    Some(p.c_popup.xdg_surface().clone())
+                } else {
+                    None
+                }
+            });
+        if clear_overflow {
+            dbg!(parent.as_ref());
+            tracing::info!("clearing overflow popup.");
+            self.overflow_popup = None;
+        } else {
+            dbg!(parent.as_ref());
+            tracing::info!("not clearing overflow popup.");
+        }
         let c_popup = popup::Popup::from_surface(
-            parent,
+            parent.as_ref(),
             &positioner,
             qh,
             c_wl_surface.clone(),
@@ -209,7 +241,7 @@ impl WrapperSpace for PanelSpace {
         c_wl_surface.commit();
 
         let cur_popup_state = Some(WrapperPopupState::WaitConfigure);
-
+        tracing::info!("adding popup to popups");
         self.popups.push(WrapperPopup {
             popup: PanelPopup {
                 damage_tracked_renderer: OutputDamageTracker::new(
