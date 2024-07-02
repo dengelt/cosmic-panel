@@ -33,6 +33,7 @@ impl PanelSpace {
             }
         }
         self.popups.clear();
+        self.overflow_popup = None;
     }
 
     pub fn configure_panel_popup(

@@ -56,9 +56,10 @@ impl PanelSpace {
         qh: &QueueHandle<GlobalState>,
         xdg_shell_state: &mut sctk::shell::xdg::XdgShell,
         seat: (u32, WlSeat),
+        force_hide: bool,
     ) -> anyhow::Result<()> {
-        self.popups.clear();
         if self.overflow_popup.is_some() {
+            tracing::info!("removing overflow popup");
             self.overflow_popup = None;
             return Ok(());
         }
@@ -71,6 +72,7 @@ impl PanelSpace {
         else {
             bail!("No element found with id: {:?}", element_id);
         };
+        tracing::info!("adding overflow popup");
         let loc = self.space.element_location(&element).unwrap_or_default();
         let bbox = element.bbox();
         let positioner = XdgPositioner::new(xdg_shell_state).unwrap();

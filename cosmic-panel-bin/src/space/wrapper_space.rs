@@ -66,6 +66,7 @@ use smithay::{
 };
 use tokio::sync::oneshot;
 use tracing::{error, error_span, info, info_span, trace};
+use wayland_backend::server::{ClientId, ObjectId};
 use wayland_protocols_wlr::layer_shell::v1::client::zwlr_layer_shell_v1;
 
 use crate::{
@@ -133,6 +134,7 @@ impl WrapperSpace for PanelSpace {
         positioner: sctk::shell::xdg::XdgPositioner,
         positioner_state: PositionerState,
     ) -> anyhow::Result<()> {
+        tracing::info!("adding popup");
         self.apply_positioner_state(&positioner, positioner_state, &s_surface);
         let c_wl_surface = compositor_state.create_surface(qh);
 
@@ -800,8 +802,14 @@ impl WrapperSpace for PanelSpace {
             self.s_hovered_surface.iter_mut().enumerate().find(|(_, f)| f.seat_name == seat_name);
         let prev_foc = self.s_focused_surface.iter_mut().find(|f| f.1 == seat_name);
         // first check if the motion is on a popup's client surface
+        #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+        pub enum HoverId {
+            Client(ClientId),
+            Overflow(id::Id),
+        }
 
-        let mut cur_client_hover_id = None;
+        let mut cur_client_hover_id: Option<HoverId> = None;
+        let mut overflow_client_hover_id = None;
         let mut hover_relative_loc = None;
         let mut hover_geo = None;
 
@@ -867,7 +875,18 @@ impl WrapperSpace for PanelSpace {
 
                 hover_geo = Some(geo);
                 hover_relative_loc = Some(relative_loc);
-                cur_client_hover_id = target.wl_surface().and_then(|t| t.client().map(|c| c.id()));
+                match &target {
+                    CosmicMappedInternal::Window(w) => {
+                        cur_client_hover_id = w
+                            .wl_surface()
+                            .and_then(|t| t.client().map(|c| HoverId::Client(c.id())));
+                    },
+                    CosmicMappedInternal::OverflowButton(b) => {
+                        cur_client_hover_id =
+                            Some(HoverId::Overflow(b.with_program(|p| p.id.clone())));
+                    },
+                    _ => {},
+                };
 
                 if let Some((_, prev_foc)) = prev_hover.as_mut() {
                     prev_foc.s_pos = relative_loc.to_f64();
@@ -936,7 +955,8 @@ impl WrapperSpace for PanelSpace {
 
                 hover_geo = Some(geo);
                 hover_relative_loc = Some(relative_loc);
-                cur_client_hover_id = target.wl_surface().and_then(|t| t.client().map(|c| c.id()));
+                overflow_client_hover_id =
+                    target.wl_surface().and_then(|t| t.client().map(|c| c.id()));
 
                 if let Some((_, prev_foc)) = prev_hover.as_mut() {
                     prev_foc.s_pos = relative_loc.to_f64();
@@ -984,25 +1004,69 @@ impl WrapperSpace for PanelSpace {
             .and_then(|p| p.s_surface.wl_surface().client())
             .map(|c| c.id());
 
-        if prev_popup_client.is_some()
-            && prev_popup_client != cur_client_hover_id
-            && self.generated_ptr_event_count == 0
+        if prev_popup_client.is_some() && matches!(cur_client_hover_id, Some(HoverId::Overflow(_)))
         {
+            self.close_popups();
+            if let Some((relative_loc, geo)) = hover_relative_loc.zip(hover_geo) {
+                // place in center
+                let mut p = (x, y);
+                p.0 = relative_loc.x + geo.size.w as i32 / 2;
+                p.1 = relative_loc.y + geo.size.h as i32 / 2;
+                self.generated_pointer_events = vec![
+                    PointerEvent {
+                        surface: self.layer.as_ref().unwrap().wl_surface().clone(),
+                        position: (p.0 as f64, p.1 as f64),
+                        kind: sctk::seat::pointer::PointerEventKind::Motion { time: 0 },
+                    },
+                    PointerEvent {
+                        surface: self.layer.as_ref().unwrap().wl_surface().clone(),
+                        position: (p.0 as f64, p.1 as f64),
+                        kind: sctk::seat::pointer::PointerEventKind::Press {
+                            time: 0,
+                            button: BTN_LEFT,
+                            serial: 0,
+                        },
+                    },
+                    PointerEvent {
+                        surface: self.layer.as_ref().unwrap().wl_surface().clone(),
+                        position: (p.0 as f64, p.1 as f64),
+                        kind: sctk::seat::pointer::PointerEventKind::Release {
+                            time: 0,
+                            button: BTN_LEFT,
+                            serial: 0,
+                        },
+                    },
+                ];
+            }
+        } else if ((prev_popup_client
+            .as_ref()
+            .zip(cur_client_hover_id.as_ref())
+            .is_some_and(|(a, b)| &HoverId::Client(a.clone()) != b))
+            || self.overflow_popup.is_some())
+            && self.generated_ptr_event_count == 0
+            && matches!(cur_client_hover_id, Some(HoverId::Client(_)))
+        {
+            self.overflow_popup = None;
             // send press to new client if it hover flag is set
             let left_guard = self.clients_left.lock().unwrap();
             let center_guard = self.clients_center.lock().unwrap();
             let right_guard = self.clients_right.lock().unwrap();
-
-            if let Some(((c, relative_loc), geo)) = left_guard
+            let client = left_guard
                 .iter()
                 .chain(center_guard.iter())
                 .chain(right_guard.iter())
                 .find(|c| {
-                    c.auto_popup_hover_press.is_some() && Some(c.client.id()) == cur_client_hover_id
+                    c.auto_popup_hover_press.is_some()
+                        && (Some(HoverId::Client(c.client.id())) == cur_client_hover_id
+                            || Some(c.client.id()) == overflow_client_hover_id)
+                })
+                .or_else(|| {
+                    // overflow button
+                    None
                 })
                 .zip(hover_relative_loc)
-                .zip(hover_geo)
-            {
+                .zip(hover_geo);
+            if let Some(((c, relative_loc), geo)) = client {
                 let mut p = (x, y);
                 let effective_anchor =
                     match (c.auto_popup_hover_press.unwrap(), self.config.is_horizontal()) {
@@ -1057,7 +1121,6 @@ impl WrapperSpace for PanelSpace {
                         // should be handled above
                     },
                 }
-
                 self.generated_pointer_events = vec![
                     PointerEvent {
                         surface: self.layer.as_ref().unwrap().wl_surface().clone(),
@@ -1084,20 +1147,15 @@ impl WrapperSpace for PanelSpace {
                     },
                 ];
             }
-        } else if prev_popup_client.is_some() && self.generated_ptr_event_count == 0 {
-            // TODO simulate button press on the overflow button...
         }
         self.generated_ptr_event_count = self.generated_ptr_event_count.saturating_sub(1);
         ret
     }
 
     fn keyboard_leave(&mut self, seat_name: &str, _: Option<c_wl_surface::WlSurface>) {
-        let prev_len = self.s_focused_surface.len();
         self.s_focused_surface.retain(|(_, name)| name != seat_name);
 
-        if prev_len != self.s_focused_surface.len() {
-            self.close_popups();
-        }
+        self.close_popups();
     }
 
     fn keyboard_enter(&mut self, _: &str, _: c_wl_surface::WlSurface) -> Option<s_WlSurface> {
