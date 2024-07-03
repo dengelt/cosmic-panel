@@ -815,17 +815,20 @@ impl WrapperSpace for PanelSpace {
                 .find(|(_, f)| f.1 == seat_name)
                 .map(|(i, f)| (i, f.0.clone()))
         } {
-            // close popups when panel is pressed
-            if self.layer.as_ref().map(|s| s.wl_surface()) == Some(&prev_foc.1) && press {
-                self.close_popups([]);
-            }
-            self.s_hovered_surface.iter().find_map(|h| {
+            let target = self.s_hovered_surface.iter().find_map(|h| {
                 if h.seat_name.as_str() == seat_name {
                     Some(h.surface.clone().into())
                 } else {
                     None
                 }
-            })
+            });
+            if target.is_none() {
+                // close popups when panel is pressed
+                if self.layer.as_ref().map(|s| s.wl_surface()) == Some(&prev_foc.1) && press {
+                    self.close_popups([]);
+                }
+            }
+            target
         } else {
             if press {
                 self.close_popups([]);
