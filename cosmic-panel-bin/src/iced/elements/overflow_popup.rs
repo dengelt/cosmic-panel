@@ -9,13 +9,14 @@ use cosmic::{
     widget::horizontal_space,
     Theme,
 };
+use cosmic_theme::palette::white_point::B;
 
 use crate::{
     iced::{Element, IcedElement, Program},
     xdg_shell_wrapper::shared_state::GlobalState,
 };
 
-use super::overflow_button::OverflowButton;
+pub const BORDER_WIDTH: u32 = 1;
 
 pub type OverflowPopupElement = IcedElement<OverflowPopup>;
 
@@ -59,7 +60,7 @@ impl Program for OverflowPopup {
                         background: Some(Color::from(cosmic.background.base).into()),
                         border: cosmic::iced::Border {
                             radius: corners.radius_m.into(),
-                            width: 1.0,
+                            width: BORDER_WIDTH as f32,
                             color: cosmic.background.divider.into(),
                         },
                         shadow: Shadow::default(),

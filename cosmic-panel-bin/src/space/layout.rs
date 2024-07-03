@@ -7,7 +7,7 @@ use std::{
 use crate::{
     iced::elements::{
         overflow_button::{self, overflow_button_element, OverflowButtonElement},
-        overflow_popup::overflow_popup_element,
+        overflow_popup::{overflow_popup_element, BORDER_WIDTH},
         CosmicMappedInternal, PopupMappedInternal,
     },
     minimize::MinimizeApplet,
@@ -19,13 +19,16 @@ use super::{panel_space::PanelClient, PanelSpace};
 use crate::xdg_shell_wrapper::space::WrapperSpace;
 use anyhow::bail;
 use cosmic_panel_config::PanelAnchor;
+use cosmic_theme::palette::white_point::B;
 use itertools::{chain, Itertools};
 use sctk::shell::WaylandSurface;
 use smithay::{
     desktop::{space::SpaceElement, Space, Window},
     reexports::wayland_server::Resource,
     utils::{IsAlive, Physical, Rectangle, Size},
-    wayland::seat::WaylandFocus,
+    wayland::{
+        compositor::with_states, fractional_scale::with_fractional_scale, seat::WaylandFocus,
+    },
 };
 
 impl PanelSpace {
@@ -663,7 +666,7 @@ impl PanelSpace {
             },
         };
 
-        let mut overflow_cnt = 0;
+        let mut overflow_cnt: usize = 0;
         let mut elements = space.elements().cloned().collect_vec();
         elements.sort_by(|a, b| {
             // sort by position in client list
@@ -696,16 +699,24 @@ impl PanelSpace {
                     } else {
                         let applet_size_unit =
                             self.config.size.get_applet_icon_size_with_padding(true);
-                        let x_i = (overflow_cnt % 8) as i32;
+                        let x_i = overflow_cnt % 8;
                         let padding = self.config.padding as i32;
                         let spacing = self.config.spacing as i32;
-                        let mut x = padding
-                            + x_i as i32 * applet_size_unit as i32
-                            + (x_i.saturating_sub(1) * spacing);
-                        let mut y = padding
+                        let mut x = BORDER_WIDTH as i32
+                            + padding
+                            + x_i as i32 * (applet_size_unit as i32 + spacing as i32);
+                        let mut y = BORDER_WIDTH as i32
+                            + padding
                             + (overflow_cnt / 8) as i32 * (applet_size_unit as i32 + spacing);
                         if !self.config.is_horizontal() {
                             std::mem::swap(&mut x, &mut y);
+                        }
+                        if let Some(w) = w.wl_surface() {
+                            with_states(w.as_ref(), |states| {
+                                with_fractional_scale(states, |fractional_scale| {
+                                    fractional_scale.set_preferred_scale(self.scale);
+                                });
+                            });
                         }
                         space.map_element(e, (x, y), false);
                         overflow_cnt += 1;
@@ -864,10 +875,12 @@ impl PanelSpace {
             let padding = self.config.padding as i32;
             let spacing = self.config.spacing;
             // TODO spacing & padding
-            let x_i = (overflow_cnt % 8) as i32;
-            let mut x =
-                padding + x_i * applet_size_unit as i32 + (x_i.saturating_sub(1)) * spacing as i32;
-            let mut y = 30 + (overflow_cnt / 8) as i32 * (applet_size_unit + spacing) as i32;
+            let x_i = overflow_cnt % 8;
+            let mut x = padding
+                + x_i as i32 * (applet_size_unit as i32 + spacing as i32)
+                + BORDER_WIDTH as i32;
+            let mut y = BORDER_WIDTH as i32
+                + (overflow_cnt / 8) as i32 * (applet_size_unit + spacing) as i32;
             if !self.config.is_horizontal() {
                 std::mem::swap(&mut x, &mut y);
             }
@@ -891,12 +904,13 @@ impl PanelSpace {
 
         let space = self.config.spacing as f32;
         let padding = self.config.padding as f32;
-        let mut popup_major = overflow_cnt.min(8) as f32 * applet_size_unit as f32
+        let mut popup_major = 2. * BORDER_WIDTH as f32
+            + overflow_cnt.min(8) as f32 * applet_size_unit as f32
             + 2. * padding
             + (overflow_cnt.min(8).saturating_sub(1) as f32) * space;
-        let mut popup_cross = (overflow_cnt as f32 / 8.).ceil().min(1.0) * applet_size_unit as f32
-            + 2. * padding
-            + ((overflow_cnt / 8).saturating_sub(1)) as f32 * space;
+        let mut popup_cross = 2. * BORDER_WIDTH as f32
+            + (overflow_cnt as f32 / 8.).ceil().min(1.0) * applet_size_unit as f32
+            + 2. * padding;
         if !self.config.is_horizontal() {
             std::mem::swap(&mut popup_major, &mut popup_cross);
         }
