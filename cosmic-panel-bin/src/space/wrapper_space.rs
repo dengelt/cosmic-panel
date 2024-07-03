@@ -1445,7 +1445,14 @@ impl WrapperSpace for PanelSpace {
                     viewport.set_destination(self.actual_size.w.max(1), self.actual_size.h.max(1));
                 }
 
-                for surface in self.space.elements().filter_map(|e| e.wl_surface().clone()) {
+                for surface in self
+                    .space
+                    .elements()
+                    .filter_map(|e| e.wl_surface().clone())
+                    .chain(self.overflow_left.elements().filter_map(|e| e.wl_surface().clone()))
+                    .chain(self.overflow_center.elements().filter_map(|e| e.wl_surface().clone()))
+                    .chain(self.overflow_right.elements().filter_map(|e| e.wl_surface().clone()))
+                {
                     with_states(&surface, |states| {
                         with_fractional_scale(states, |fractional_scale| {
                             fractional_scale.set_preferred_scale(scale);
