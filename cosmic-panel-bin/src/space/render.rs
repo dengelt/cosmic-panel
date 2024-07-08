@@ -307,7 +307,7 @@ impl PanelSpace {
                             .element_location(&PopupMappedInternal::Window(w.clone()))
                             .unwrap_or_default()
                             .to_f64()
-                            .to_physical(1.0)
+                            .to_physical(self.scale)
                             .to_i32_round();
                         Some(
                             render_elements_from_surface_tree(

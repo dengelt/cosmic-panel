@@ -50,7 +50,6 @@ impl PanelSpace {
             .popups
             .iter_mut()
             .map(|p| (&mut p.popup, Some(&mut p.s_surface)))
-            .chain(self.overflow_popup.iter_mut().map(|p| (&mut p.0, None)))
             .find(|(p, _)| popup.wl_surface() == p.c_popup.wl_surface())
         {
             tracing::info!("Configuring popup: {:?}", config);
@@ -84,6 +83,67 @@ impl PanelSpace {
                                 return;
                             },
                         };
+                    let client_egl_surface = unsafe {
+                        ClientEglSurface::new(wl_egl_surface, p.c_popup.wl_surface().clone())
+                    };
+                    let egl_surface = Rc::new(unsafe {
+                        EGLSurface::new(
+                            renderer.egl_context().display(),
+                            renderer
+                                .egl_context()
+                                .pixel_format()
+                                .expect("Failed to get pixel format from EGL context "),
+                            renderer.egl_context().config_id(),
+                            client_egl_surface,
+                        )
+                        .expect("Failed to initialize EGL Surface")
+                    });
+                    p.egl_surface.replace(egl_surface);
+                    p.dirty = true;
+                    tracing::info!("Popup configured");
+                },
+                popup::ConfigureKind::Reactive => {},
+                popup::ConfigureKind::Reposition { token: _token } => {},
+                _ => {},
+            };
+        } else if self
+            .overflow_popup
+            .as_ref()
+            .is_some_and(|p| p.0.c_popup.wl_surface() == popup.wl_surface())
+        {
+            let (p, _) = self.overflow_popup.as_mut().unwrap();
+            tracing::info!("Configuring overflow popup: {:?}", config);
+            // use the size that we have already if the new size is 0
+            if config.width == 0 {
+                config.width = p.wrapper_rectangle.size.w;
+            }
+            if config.height == 0 {
+                config.height = p.wrapper_rectangle.size.h;
+            }
+            let (width, height) = (config.width, config.height);
+            p.wrapper_rectangle = Rectangle::from_loc_and_size(config.position, (width, height));
+
+            p.state = match p.state {
+                None | Some(WrapperPopupState::WaitConfigure) => None,
+                Some(r) => Some(r),
+            };
+
+            match config.kind {
+                popup::ConfigureKind::Initial => {
+                    tracing::info!("Popup Initial Configure");
+                    let width_scaled = (width as f64 * self.scale) as i32;
+                    let height_scaled = (height as f64 * self.scale) as i32;
+                    let wl_egl_surface = match WlEglSurface::new(
+                        p.c_popup.wl_surface().id(),
+                        width_scaled,
+                        height_scaled,
+                    ) {
+                        Ok(s) => s,
+                        Err(err) => {
+                            tracing::error!("Failed to create WlEglSurface: {:?}", err);
+                            return;
+                        },
+                    };
                     let client_egl_surface = unsafe {
                         ClientEglSurface::new(wl_egl_surface, p.c_popup.wl_surface().clone())
                     };
