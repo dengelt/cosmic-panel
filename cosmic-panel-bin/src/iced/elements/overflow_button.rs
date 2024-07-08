@@ -38,13 +38,30 @@ pub fn overflow_button_element(
     handle: LoopHandle<'static, GlobalState>,
     theme: cosmic::Theme,
     panel_id: usize,
+    scale: f32,
 ) -> OverflowButtonElement {
+    let icon_size = icon_size as f32 * scale;
+    let Padding { top, right, bottom, left } = button_padding;
+    let button_padding = Padding {
+        top: top * scale,
+        right: right * scale,
+        bottom: bottom * scale,
+        left: left * scale,
+    };
     let size = (
         (icon_size as f32 + button_padding.horizontal()).round() as i32,
         (icon_size as f32 + button_padding.vertical()).round() as i32,
     );
     IcedElement::new(
-        OverflowButton::new(id, pos, icon_size, button_padding, selected, icon, panel_id),
+        OverflowButton::new(
+            id,
+            pos,
+            icon_size.round() as u16,
+            button_padding,
+            selected,
+            icon,
+            panel_id,
+        ),
         Size::from(size),
         handle,
         theme,

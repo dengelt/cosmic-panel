@@ -27,7 +27,10 @@ pub fn overflow_popup_element(
     loop_handle: LoopHandle<'static, GlobalState>,
     theme: Theme,
     panel_id: usize,
+    scale: f32,
 ) -> OverflowPopupElement {
+    let logical_width = logical_width * scale;
+    let logical_height = logical_height * scale;
     IcedElement::new(
         OverflowPopup { id, logical_width, logical_height },
         (logical_width.round() as i32, logical_height.round() as i32),

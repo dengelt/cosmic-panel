@@ -12,12 +12,12 @@ use crate::{
     },
     minimize::MinimizeApplet,
     space::{corner_element::RoundedRectangleSettings, Alignment},
-    xdg_shell_wrapper::space,
 };
 
 use super::{panel_space::PanelClient, PanelSpace};
 use crate::xdg_shell_wrapper::space::WrapperSpace;
 use anyhow::bail;
+use cosmic::iced::id;
 use cosmic_panel_config::PanelAnchor;
 use cosmic_theme::palette::white_point::B;
 use itertools::{chain, Itertools};
@@ -47,6 +47,7 @@ impl PanelSpace {
 
         let mut left_overflow_button = None;
         let mut right_overflow_button = None;
+        let mut center_overflow_button = None;
 
         let to_unmap = self
             .space
@@ -68,6 +69,7 @@ impl PanelSpace {
                             &self.center_overflow_button_id == id
                         }) =>
                     {
+                        center_overflow_button = Some(b);
                         return None;
                     },
                     CosmicMappedInternal::OverflowButton(b)
@@ -195,12 +197,17 @@ impl PanelSpace {
                 .collect_vec();
         }
 
+        if self.unmapped.len() > 0 {
+            dbg!(&self.unmapped);
+        }
+
         self.layout(
             windows_left,
             windows_center,
             windows_right,
             left_overflow_button,
             right_overflow_button,
+            center_overflow_button,
         )
     }
 
@@ -211,6 +218,7 @@ impl PanelSpace {
         mut windows_right: Vec<(usize, Window, Option<u32>)>,
         left_overflow_button: Option<OverflowButtonElement>,
         right_overflow_button: Option<OverflowButtonElement>,
+        center_overflow_button: Option<OverflowButtonElement>,
     ) -> anyhow::Result<()> {
         self.space.refresh();
         let mut bg_color = self.bg_color();
@@ -269,7 +277,7 @@ impl PanelSpace {
         let left_sum_scaled = left.clone().map(|(_, _, length, _)| length).sum::<i32>() as f64
             + spacing_scaled as f64 * windows_left.len().saturating_sub(1) as f64;
         let left_sum_scaled = if let Some(left_button) = left_overflow_button.as_ref() {
-            let size = left_button.bbox().size.to_f64().upscale(self.scale);
+            let size = left_button.bbox().size.to_f64();
             left_sum_scaled
                 + if self.config.is_horizontal() { size.w } else { size.h } as f64
                 + spacing_scaled
@@ -281,12 +289,20 @@ impl PanelSpace {
             windows_center.iter().map(|e| map_fn(e, anchor, Alignment::Center, self.scale));
         let center_sum_scaled = center.clone().map(|(_, _, length, _)| length).sum::<i32>() as f64
             + spacing_scaled * windows_center.len().saturating_sub(1) as f64;
+        let center_sum_scaled = if let Some(center_button) = center_overflow_button.as_ref() {
+            let size = center_button.bbox().size.to_f64();
+            center_sum_scaled
+                + if self.config.is_horizontal() { size.w } else { size.h } as f64
+                + spacing_scaled
+        } else {
+            center_sum_scaled
+        };
 
         let right = windows_right.iter().map(|e| map_fn(e, anchor, Alignment::Right, self.scale));
         let right_sum_scaled = right.clone().map(|(_, _, length, _)| length).sum::<i32>() as f64
             + spacing_scaled * windows_right.len().saturating_sub(1) as f64;
         let right_sum_scaled = if let Some(right_button) = right_overflow_button.as_ref() {
-            let size = right_button.bbox().size.to_f64().upscale(self.scale);
+            let size = right_button.bbox().size.to_f64();
             right_sum_scaled
                 + if self.config.is_horizontal() { size.w } else { size.h } as f64
                 + spacing_scaled
@@ -366,9 +382,10 @@ impl PanelSpace {
         let center_pos = layer_major as f64 / 2. - center_sum / 2.;
         let left_pos = container_lengthwise_pos as f64 + padding_u32 as f64;
 
-        let mut right_pos = container_lengthwise_pos as f64 + container_length as f64
+        let mut right_pos = (container_lengthwise_pos as f64 + container_length as f64
             - padding_u32 as f64
-            - right_sum;
+            - right_sum);
+
         let one_third = (layer_major as f64 - (spacing_u32 * num_lists.saturating_sub(1)) as f64)
             / (3.min(num_lists) as f64);
         let one_half = layer_major as f64 / (2.min(num_lists) as f64);
@@ -531,15 +548,16 @@ impl PanelSpace {
         } as i32;
 
         if let Some(right_button) = right_overflow_button {
-            let size = right_button.bbox().size.to_f64().upscale(self.scale);
-
+            let margin_offset_scaled = (margin_offset as f64 * self.scale).round() as i32;
+            let size = right_button.bbox().size.to_f64().downscale(self.scale);
             let crosswise_pos = if self.config.is_horizontal() {
-                margin_offset
+                margin_offset_scaled
                     + center_in_bar(new_logical_thickness.try_into().unwrap(), size.w as u32)
             } else {
-                margin_offset
+                margin_offset_scaled
                     + center_in_bar(new_logical_thickness.try_into().unwrap(), size.h as u32)
             };
+
             let loc = if self.config().is_horizontal() {
                 (right_pos.round() as i32, crosswise_pos)
             } else {
@@ -629,7 +647,7 @@ impl PanelSpace {
         map_windows(windows_right.iter_mut(), right_pos as f64);
         // if there is a left overflow_button, map it
         if let Some(left_button) = left_overflow_button {
-            let size = left_button.bbox().size.to_f64().upscale(self.scale);
+            let size = left_button.bbox().size.to_f64();
 
             let crosswise_pos = if self.config.is_horizontal() {
                 margin_offset
@@ -710,13 +728,6 @@ impl PanelSpace {
                             + (overflow_cnt / 8) as i32 * (applet_size_unit as i32 + spacing);
                         if !self.config.is_horizontal() {
                             std::mem::swap(&mut x, &mut y);
-                        }
-                        if let Some(w) = w.wl_surface() {
-                            with_states(w.as_ref(), |states| {
-                                with_fractional_scale(states, |fractional_scale| {
-                                    fractional_scale.set_preferred_scale(self.scale);
-                                });
-                            });
                         }
                         space.map_element(e, (x, y), false);
                         overflow_cnt += 1;
@@ -886,14 +897,19 @@ impl PanelSpace {
             }
 
             space.unmap_elem(&CosmicMappedInternal::Window(w.0.clone()));
+            overflow_space.map_element(PopupMappedInternal::Window(w.0.clone()), (x, y), true);
             // Rows of 8 with configured applet size
             if let Some(t) = w.0.toplevel() {
                 t.with_pending_state(|s| {
                     s.size = Some((applet_size_unit as i32, applet_size_unit as i32).into());
                 });
+                with_states(t.wl_surface(), |states| {
+                    with_fractional_scale(states, |fractional_scale| {
+                        fractional_scale.set_preferred_scale(self.scale);
+                    });
+                });
                 t.send_pending_configure();
             }
-            overflow_space.map_element(PopupMappedInternal::Window(w.0), (x, y), true);
             overflow_cnt += 1;
         }
         overflow_space.refresh();
@@ -943,6 +959,7 @@ impl PanelSpace {
                 self.loop_handle.clone(),
                 self.colors.theme.clone(),
                 self.space.id(),
+                1. as f32,
             ))
         };
         if !had_overflow_prev && overflow_space.elements().count() > 0 {
@@ -971,11 +988,12 @@ impl PanelSpace {
                 self.loop_handle.clone(),
                 self.colors.theme.clone(),
                 self.space.id(),
+                self.scale as f32,
             );
-            let output = self.output.as_ref().map(|o| &o.1).unwrap();
-            e.output_enter(&output, Default::default());
+            // let output = self.output.as_ref().map(|o| &o.1).unwrap();
+            // e.output_enter(&output, Default::default());
             let new_popup = new_popup();
-            new_popup.output_enter(&output, Default::default());
+            // new_popup.output_enter(&output, Default::default());
             overflow_space.map_element(new_popup, (0, 0), false);
             self.space.map_element(
                 CosmicMappedInternal::OverflowButton(e),
@@ -989,7 +1007,7 @@ impl PanelSpace {
             let e = new_popup();
             let output = self.output.as_ref().map(|o| &o.1).unwrap();
 
-            e.output_enter(output, Default::default());
+            // e.output_enter(output, Default::default());
             overflow_space.unmap_elem(&overflow_popup);
             overflow_space.map_element(e, (0, 0), false);
         }

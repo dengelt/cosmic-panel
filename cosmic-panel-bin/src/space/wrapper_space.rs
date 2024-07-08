@@ -1293,6 +1293,10 @@ impl WrapperSpace for PanelSpace {
             (c_output.as_ref(), s_output.as_ref(), output_info.as_ref())
         {
             self.space.map_output(s_output, output_info.location);
+            self.overflow_center.map_output(s_output, output_info.location);
+            self.overflow_left.map_output(s_output, output_info.location);
+            self.overflow_right.map_output(s_output, output_info.location);
+
             match &self.config.output {
                 CosmicPanelOuput::Active => {
                     bail!("output does not match config")
@@ -1445,19 +1449,51 @@ impl WrapperSpace for PanelSpace {
                     viewport.set_destination(self.actual_size.w.max(1), self.actual_size.h.max(1));
                 }
 
-                for surface in self
-                    .space
-                    .elements()
-                    .filter_map(|e| e.wl_surface().clone())
-                    .chain(self.overflow_left.elements().filter_map(|e| e.wl_surface().clone()))
-                    .chain(self.overflow_center.elements().filter_map(|e| e.wl_surface().clone()))
-                    .chain(self.overflow_right.elements().filter_map(|e| e.wl_surface().clone()))
-                {
+                for surface in self.space.elements().filter_map(|e| e.wl_surface().clone()) {
                     with_states(&surface, |states| {
                         with_fractional_scale(states, |fractional_scale| {
                             fractional_scale.set_preferred_scale(scale);
                         });
                     });
+                }
+            }
+        }
+        // check overflow popup
+        if let Some((popup, _)) = self.overflow_popup.as_mut() {
+            if popup.c_popup.wl_surface() == surface {
+                popup.scale = scale;
+                let Rectangle { loc, size } = popup.rectangle;
+                if popup.state.is_none() {
+                    popup.state = Some(WrapperPopupState::Rectangle {
+                        x: loc.x,
+                        y: loc.y,
+                        width: size.w,
+                        height: size.h,
+                    });
+                }
+
+                for surface in self
+                    .overflow_left
+                    .elements()
+                    .filter_map(|e| e.wl_surface().clone())
+                    .chain(self.overflow_center.elements().filter_map(|e| e.wl_surface().clone()))
+                    .chain(self.overflow_right.elements().filter_map(|e| e.wl_surface().clone()))
+                {
+                    if legacy {
+                        popup.c_popup.wl_surface().set_buffer_scale(scale as i32);
+                    } else {
+                        popup.c_popup.wl_surface().set_buffer_scale(1);
+
+                        if let Some(viewport) = popup.viewport.as_ref() {
+                            viewport.set_destination(size.w.max(1), size.h.max(1));
+                        }
+
+                        with_states(&surface, |states| {
+                            with_fractional_scale(states, |fractional_scale| {
+                                fractional_scale.set_preferred_scale(scale);
+                            });
+                        });
+                    }
                 }
             }
         }
