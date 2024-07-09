@@ -1444,9 +1444,7 @@ impl WrapperSpace for PanelSpace {
         if Some(surface) == self.layer.as_ref().map(|l| l.wl_surface())
             || self.overflow_popup.as_ref().is_some_and(|p| p.0.c_popup.wl_surface() == surface)
         {
-            self.scale_change_retries = 10;
             self.scale = scale;
-            self.is_dirty = true;
             if legacy && self.layer_fractional_scale.is_none() {
                 surface.set_buffer_scale(scale as i32);
             } else {
@@ -1454,13 +1452,39 @@ impl WrapperSpace for PanelSpace {
                 if let Some(viewport) = self.layer_viewport.as_ref() {
                     viewport.set_destination(self.actual_size.w.max(1), self.actual_size.h.max(1));
                 }
-
                 for surface in self.space.elements().filter_map(|e| e.wl_surface().clone()) {
                     with_states(&surface, |states| {
                         with_fractional_scale(states, |fractional_scale| {
                             fractional_scale.set_preferred_scale(scale);
                         });
                     });
+                }
+
+                let overflow = self
+                    .overflow_left
+                    .elements()
+                    .cloned()
+                    .chain(self.overflow_center.elements().cloned())
+                    .chain(self.overflow_right.elements().cloned())
+                    .collect::<Vec<_>>();
+
+                for e in overflow {
+                    self.overflow_left.unmap_elem(&e);
+                    self.overflow_center.unmap_elem(&e);
+                    self.overflow_right.unmap_elem(&e);
+                    let window = match e {
+                        PopupMappedInternal::Window(w) => w,
+                        _ => continue,
+                    };
+                    let Some(wl_surface) = window.wl_surface() else {
+                        continue;
+                    };
+                    with_states(&wl_surface, |states| {
+                        with_fractional_scale(states, |fractional_scale| {
+                            fractional_scale.set_preferred_scale(scale);
+                        });
+                    });
+                    self.space.map_element(CosmicMappedInternal::Window(window), (0, 0), false);
                 }
             }
 
@@ -1494,27 +1518,13 @@ impl WrapperSpace for PanelSpace {
                     });
                 }
 
-                for surface in self
-                    .overflow_left
-                    .elements()
-                    .filter_map(|e| e.wl_surface().clone())
-                    .chain(self.overflow_center.elements().filter_map(|e| e.wl_surface().clone()))
-                    .chain(self.overflow_right.elements().filter_map(|e| e.wl_surface().clone()))
-                {
-                    if legacy {
-                        popup.c_popup.wl_surface().set_buffer_scale(scale as i32);
-                    } else {
-                        popup.c_popup.wl_surface().set_buffer_scale(1);
+                if legacy {
+                    popup.c_popup.wl_surface().set_buffer_scale(scale as i32);
+                } else {
+                    popup.c_popup.wl_surface().set_buffer_scale(1);
 
-                        if let Some(viewport) = popup.viewport.as_ref() {
-                            viewport.set_destination(size.w.max(1), size.h.max(1));
-                        }
-
-                        with_states(&surface, |states| {
-                            with_fractional_scale(states, |fractional_scale| {
-                                fractional_scale.set_preferred_scale(scale);
-                            });
-                        });
+                    if let Some(viewport) = popup.viewport.as_ref() {
+                        viewport.set_destination(size.w.max(1), size.h.max(1));
                     }
                 }
             }
