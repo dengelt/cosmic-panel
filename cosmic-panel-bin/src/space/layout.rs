@@ -17,9 +17,7 @@ use crate::{
 use super::{panel_space::PanelClient, PanelSpace};
 use crate::xdg_shell_wrapper::space::WrapperSpace;
 use anyhow::bail;
-use cosmic::iced::id;
 use cosmic_panel_config::PanelAnchor;
-use cosmic_theme::palette::white_point::B;
 use itertools::{chain, Itertools};
 use sctk::shell::WaylandSurface;
 use smithay::{
@@ -44,7 +42,25 @@ impl PanelSpace {
         let mut to_map: Vec<Window> = Vec::with_capacity(self.space.elements().count());
         // must handle unmapped windows, and unmap windows that are too large for the
         // current configuration.
-
+        let Some(output) = self.output.as_ref().map(|o| o.1.clone()) else {
+            bail!("output missing")
+        };
+        for w in self.unmapped.drain(..).collect_vec() {
+            let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
+            if w.alive() && {
+                let constrained = self.constrain_dim(size, Some(gap as u32));
+                if self.config.is_horizontal() {
+                    constrained.h >= size.h
+                } else {
+                    constrained.w >= size.w
+                }
+            } {
+                self.space.map_element(CosmicMappedInternal::Window(w.clone()), (0, 0), false);
+                w.output_enter(&output, Rectangle::default())
+            } else {
+                self.unmapped.push(w);
+            }
+        }
         let mut left_overflow_button = None;
         let mut right_overflow_button = None;
         let mut center_overflow_button = None;
@@ -105,23 +121,7 @@ impl PanelSpace {
                 unmap.then_some(w)
             })
             .collect_vec();
-        for w in self.unmapped.drain(..).collect_vec() {
-            let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
 
-            if w.alive() && {
-                let constrained = self.constrain_dim(size, Some(gap as u32));
-                if self.config.is_horizontal() {
-                    constrained.h >= size.h
-                } else {
-                    constrained.w >= size.w
-                }
-            } {
-                to_map.push(w);
-            } else {
-                tracing::trace!("Window was unmapped and will stay so. {:?}", w.bbox());
-                self.unmapped.push(w);
-            }
-        }
         // HACK temporarily avoid unmapping windows when changing scale
         if to_unmap.len() > 0 && self.scale_change_retries == 0 {
             for w in to_unmap {
@@ -138,11 +138,11 @@ impl PanelSpace {
             .iter()
             .cloned()
             .filter_map(|w| {
+                let Some(t) = w.toplevel() else {
+                    tracing::warn!("Window {:?} has no toplevel", w.bbox());
+                    return None;
+                };
                 self.clients_left.lock().unwrap().iter().enumerate().find_map(|(i, c)| {
-                    let Some(t) = w.toplevel() else {
-                        return None;
-                    };
-
                     if Some(c.client.id()) == t.wl_surface().client().map(|c| c.id()) {
                         Some((i, w.clone(), c.minimize_priority))
                     } else {
@@ -157,10 +157,11 @@ impl PanelSpace {
             .iter()
             .cloned()
             .filter_map(|w| {
+                let Some(t) = w.toplevel() else {
+                    tracing::warn!("Window {:?} has no toplevel", w.bbox());
+                    return None;
+                };
                 self.clients_center.lock().unwrap().iter().enumerate().find_map(|(i, c)| {
-                    let Some(t) = w.toplevel() else {
-                        return None;
-                    };
                     if Some(c.client.id()) == t.wl_surface().client().map(|c| c.id()) {
                         Some((i, w.clone(), c.minimize_priority))
                     } else {
@@ -175,10 +176,11 @@ impl PanelSpace {
             .iter()
             .cloned()
             .filter_map(|w| {
+                let Some(t) = w.toplevel() else {
+                    tracing::warn!("Window {:?} has no toplevel", w.bbox());
+                    return None;
+                };
                 self.clients_right.lock().unwrap().iter().enumerate().find_map(|(i, c)| {
-                    let Some(t) = w.toplevel() else {
-                        return None;
-                    };
                     if Some(c.client.id()) == t.wl_surface().client().map(|c| c.id()) {
                         Some((i, w.clone(), c.minimize_priority))
                     } else {
