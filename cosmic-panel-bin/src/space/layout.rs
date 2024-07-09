@@ -197,10 +197,6 @@ impl PanelSpace {
                 .collect_vec();
         }
 
-        if self.unmapped.len() > 0 {
-            dbg!(&self.unmapped);
-        }
-
         self.layout(
             windows_left,
             windows_center,
@@ -959,7 +955,7 @@ impl PanelSpace {
                 self.loop_handle.clone(),
                 self.colors.theme.clone(),
                 self.space.id(),
-                1. as f32,
+                self.scale as f32,
             ))
         };
         if !had_overflow_prev && overflow_space.elements().count() > 0 {
@@ -990,10 +986,10 @@ impl PanelSpace {
                 self.space.id(),
                 self.scale as f32,
             );
-            // let output = self.output.as_ref().map(|o| &o.1).unwrap();
-            // e.output_enter(&output, Default::default());
+            let output = self.output.as_ref().map(|o| &o.1).unwrap();
+            e.output_enter(&output, Default::default());
             let new_popup = new_popup();
-            // new_popup.output_enter(&output, Default::default());
+            new_popup.output_enter(&output, Default::default());
             overflow_space.map_element(new_popup, (0, 0), false);
             self.space.map_element(
                 CosmicMappedInternal::OverflowButton(e),
@@ -1007,7 +1003,7 @@ impl PanelSpace {
             let e = new_popup();
             let output = self.output.as_ref().map(|o| &o.1).unwrap();
 
-            // e.output_enter(output, Default::default());
+            e.output_enter(output, Default::default());
             overflow_space.unmap_elem(&overflow_popup);
             overflow_space.map_element(e, (0, 0), false);
         }
