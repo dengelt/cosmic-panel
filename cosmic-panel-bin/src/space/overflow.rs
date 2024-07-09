@@ -77,7 +77,7 @@ impl PanelSpace {
         let loc = self.space.element_location(&element).unwrap_or_default();
         let bbox = element.bbox();
         let positioner = XdgPositioner::new(xdg_shell_state).unwrap();
-        let popup_bbox = popup_element.bbox();
+        let popup_bbox = popup_element.bbox().to_f64().downscale(self.scale).to_i32_round();
         let popup_bbox_upscale: Rectangle<i32, Logical> =
             popup_bbox.to_f64().upscale(self.scale).to_i32_round();
         positioner.set_anchor_rect(loc.x, loc.y, bbox.size.w, bbox.size.h);
@@ -125,8 +125,6 @@ impl PanelSpace {
             viewport.set_destination(popup_bbox.size.w.max(1), popup_bbox.size.h.max(1));
             viewport
         });
-        dbg!(popup_bbox);
-        dbg!(popup_bbox_upscale);
         if fractional_scale.is_none() {
             c_wl_surface.set_buffer_scale(self.scale as i32);
         }

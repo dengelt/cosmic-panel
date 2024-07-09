@@ -895,19 +895,23 @@ impl WrapperSpace for PanelSpace {
             // FIXME
             // There has to be a way to avoid messing with the scaling like this...
             let space_focus = self.space.elements().rev().find_map(|e| {
-                let Some(render_location) = self.space.element_location(e) else {
+                let Some(location) = self.space.element_location(e) else {
                     self.generated_ptr_event_count =
                         self.generated_ptr_event_count.saturating_sub(1);
                     return None;
                 };
 
-                let mut bbox = e.bbox().to_f64();
-                bbox.size.w /= self.scale;
-                bbox.size.h /= self.scale;
-                bbox.loc.x = render_location.x as f64;
-                bbox.loc.y = render_location.y as f64;
+                // XXX e.bbox seems to include the popup
+                let mut size = match e {
+                    CosmicMappedInternal::OverflowButton(b) => b.bbox().size,
+                    CosmicMappedInternal::Window(w) => w.bbox().size,
+                    _ => return None,
+                }
+                .to_f64();
+                size = size.downscale(self.scale);
+                let bbox = Rectangle::from_loc_and_size(location.to_f64(), size);
                 if bbox.contains((x as f64, y as f64)) {
-                    Some((e.clone(), render_location))
+                    Some((e.clone(), location))
                 } else {
                     None
                 }
