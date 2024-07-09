@@ -1452,8 +1452,24 @@ impl WrapperSpace for PanelSpace {
             ));
             if legacy && self.layer_fractional_scale.is_none() {
                 surface.set_buffer_scale(scale as i32);
+                if let Some(output) = self.output.as_ref() {
+                    output.1.change_current_state(
+                        None,
+                        None,
+                        Some(smithay::output::Scale::Integer(scale as i32)),
+                        None,
+                    );
+                }
             } else {
                 surface.set_buffer_scale(1);
+                if let Some(output) = self.output.as_ref() {
+                    output.1.change_current_state(
+                        None,
+                        None,
+                        Some(smithay::output::Scale::Fractional(scale)),
+                        None,
+                    );
+                }
                 if let Some(viewport) = self.layer_viewport.as_ref() {
                     viewport.set_destination(self.actual_size.w.max(1), self.actual_size.h.max(1));
                 }
@@ -1525,6 +1541,7 @@ impl WrapperSpace for PanelSpace {
                 layer.set_size(size.0, size.1);
                 layer.commit();
                 self.pending_dimensions = Some(Size::from((size.0 as i32, size.1 as i32)));
+                self.space.refresh();
             }
 
             // check overflow popup
