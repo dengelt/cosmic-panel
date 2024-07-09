@@ -1441,7 +1441,9 @@ impl WrapperSpace for PanelSpace {
                 .and_then(|o| o.2.name.clone())
                 .unwrap_or_else(|| "None".to_string())
         );
-        if Some(surface) == self.layer.as_ref().map(|l| l.wl_surface()) {
+        if Some(surface) == self.layer.as_ref().map(|l| l.wl_surface())
+            || self.overflow_popup.as_ref().is_some_and(|p| p.0.c_popup.wl_surface() == surface)
+        {
             self.scale_change_retries = 10;
             self.scale = scale;
             self.is_dirty = true;
@@ -1461,10 +1463,26 @@ impl WrapperSpace for PanelSpace {
                     });
                 }
             }
-        }
-        // check overflow popup
-        if let Some((popup, _)) = self.overflow_popup.as_mut() {
-            if popup.c_popup.wl_surface() == surface {
+
+            // request a new size for the layer surface with suggested cross-wise size and 0
+            // for length
+            if let Some(layer) = self.layer.as_ref() {
+                let suggested_size = self.config.get_applet_icon_size(true)
+                    + self.config.get_applet_padding(true) as u32 * 2;
+                let suggested_size = (suggested_size as f64 * scale).round() as u32;
+                let size = if self.config.is_horizontal() {
+                    (0, suggested_size)
+                } else {
+                    (suggested_size, 0)
+                };
+
+                layer.set_size(size.0, size.1);
+                layer.commit();
+                self.pending_dimensions = Some(Size::from((size.0 as i32, size.1 as i32)));
+            }
+
+            // check overflow popup
+            if let Some((popup, _)) = self.overflow_popup.as_mut() {
                 popup.scale = scale;
                 let Rectangle { loc, size } = popup.rectangle;
                 if popup.state.is_none() {
