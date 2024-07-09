@@ -1445,6 +1445,11 @@ impl WrapperSpace for PanelSpace {
             || self.overflow_popup.as_ref().is_some_and(|p| p.0.c_popup.wl_surface() == surface)
         {
             self.scale = scale;
+            self.damage_tracked_renderer = Some(OutputDamageTracker::new(
+                self.dimensions.to_f64().to_physical(self.scale).to_i32_round(),
+                1.0,
+                smithay::utils::Transform::Flipped180,
+            ));
             if legacy && self.layer_fractional_scale.is_none() {
                 surface.set_buffer_scale(scale as i32);
             } else {
@@ -1485,6 +1490,23 @@ impl WrapperSpace for PanelSpace {
                         });
                     });
                     self.space.map_element(CosmicMappedInternal::Window(window), (0, 0), false);
+                }
+                // remove all button elements from the space
+                let buttons = self
+                    .space
+                    .elements()
+                    .cloned()
+                    .filter_map(|e| {
+                        if let CosmicMappedInternal::OverflowButton(b) = e {
+                            Some(b)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                for b in buttons {
+                    self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(b.clone()));
                 }
             }
 
