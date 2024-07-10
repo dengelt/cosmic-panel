@@ -139,7 +139,8 @@ impl PanelSpace {
             })
             .collect_vec();
         for w in to_unmap {
-            self.space.unmap_elem(&CosmicMappedInternal::Window(w));
+            self.space.unmap_elem(&CosmicMappedInternal::Window(w.clone()));
+            self.unmapped.push(w);
         }
 
         let is_dock = !self.config.expand_to_edges()
