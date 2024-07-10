@@ -48,12 +48,18 @@ impl PanelSpace {
         for w in self.unmapped.drain(..).collect_vec() {
             let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
             if w.alive() && {
-                let constrained = self.constrain_dim(size, Some(gap as u32));
-                if self.config.is_horizontal() {
-                    constrained.h >= size.h
-                } else {
-                    constrained.w >= size.w
+                let mut constrained = self.constrain_dim(size, Some(gap as u32));
+                let suggested = w.toplevel().and_then(|w| w.current_state().size);
+                if let Some(suggested) = suggested {
+                    if suggested.w > 0 {
+                        constrained.w = constrained.w.min(suggested.w);
+                    }
+                    if suggested.h > 0 {
+                        constrained.h = constrained.h.min(suggested.h);
+                    }
                 }
+
+                constrained.h >= size.h && constrained.w >= size.w
             } {
                 self.space.map_element(CosmicMappedInternal::Window(w.clone()), (0, 0), false);
                 if let Some(t) = w.toplevel() {
@@ -108,32 +114,32 @@ impl PanelSpace {
                 }
                 let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
 
-                let constrained = self.constrain_dim(size, Some(gap as u32));
-                let unmap = if self.config.is_horizontal() {
-                    constrained.h < size.h
-                } else {
-                    constrained.w < size.w
-                };
+                let mut constrained = self.constrain_dim(size, Some(gap as u32));
+                let suggested = w.toplevel().and_then(|w| w.current_state().size);
+                if let Some(suggested) = suggested {
+                    if suggested.w > 0 {
+                        constrained.w = constrained.w.min(suggested.w);
+                    }
+                    if suggested.h > 0 {
+                        constrained.h = constrained.h.min(suggested.h);
+                    }
+                }
+                let unmap = constrained.h < size.h || constrained.w < size.w;
+
                 if unmap {
                     tracing::error!(
                         "Window {size:?} is too large for what panel configuration allows \
                          {constrained:?}. It will be unmapped.",
                     );
+                    Some(w)
                 } else {
                     to_map.push(w.clone());
+                    None
                 }
-                unmap.then_some(w)
             })
             .collect_vec();
-
-        // HACK temporarily avoid unmapping windows when changing scale
-        if to_unmap.len() > 0 && self.scale_change_retries == 0 {
-            for w in to_unmap {
-                self.space.unmap_elem(&CosmicMappedInternal::Window(w.clone()));
-                self.unmapped.push(w);
-            }
-        } else {
-            self.scale_change_retries = self.scale_change_retries.saturating_sub(1);
+        for w in to_unmap {
+            self.space.unmap_elem(&CosmicMappedInternal::Window(w));
         }
 
         let is_dock = !self.config.expand_to_edges()
@@ -589,22 +595,7 @@ impl PanelSpace {
             for (_, w, minimize_priority) in windows {
                 // XXX this is a hack to get the logical size of the window
                 // TODO improve how this is done
-                let bbox = w.bbox().size.to_f64().downscale(self.scale);
-                let size = w
-                    .toplevel()
-                    .and_then(|t| t.current_state().size)
-                    .map(|s| {
-                        let mut ret = s.to_f64();
-                        if s.w == 0 {
-                            ret.w = bbox.w;
-                        }
-                        if s.h == 0 {
-                            ret.h = bbox.h;
-                        }
-
-                        ret
-                    })
-                    .unwrap_or_else(|| bbox);
+                let size = w.bbox().size.to_f64().downscale(self.scale);
 
                 let cur: f64 = prev;
                 let (x, y);
@@ -880,11 +871,11 @@ impl PanelSpace {
         clients: &mut OverflowClientPartition,
         section: OverflowSection,
     ) -> u32 {
-        let mut i = 0;
-        let shrinkable = &mut clients.shrinkable;
         let unit_size = self.config.size.get_applet_icon_size_with_padding(true);
+
+        let shrinkable = &mut clients.shrinkable;
         for (w, _, min_units) in shrinkable.iter_mut() {
-            if overflow == 0 {
+            if overflow < unit_size {
                 break;
             }
             let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
@@ -893,7 +884,6 @@ impl PanelSpace {
             let new_dim = (major_dim as u32).saturating_sub(overflow).max(*min_units * unit_size);
             let diff = (major_dim as u32).saturating_sub(new_dim);
             if diff == 0 {
-                i += 1;
                 continue;
             }
 
@@ -908,7 +898,6 @@ impl PanelSpace {
                 t.send_pending_configure();
                 overflow = overflow.saturating_sub(diff);
             }
-            i += 1;
         }
         if overflow > 0 {
             return self.move_to_overflow(
