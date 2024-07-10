@@ -5,10 +5,15 @@ use std::{
 };
 
 use crate::{
-    iced::elements::{
-        overflow_button::{self, overflow_button_element, OverflowButtonElement},
-        overflow_popup::{overflow_popup_element, BORDER_WIDTH},
-        CosmicMappedInternal, PopupMappedInternal,
+    iced::{
+        elements::{
+            overflow_button::{
+                self, overflow_button_element, OverflowButton, OverflowButtonElement,
+            },
+            overflow_popup::{overflow_popup_element, BORDER_WIDTH},
+            CosmicMappedInternal, PopupMappedInternal,
+        },
+        IcedElement,
     },
     minimize::MinimizeApplet,
     space::{corner_element::RoundedRectangleSettings, Alignment},
@@ -225,9 +230,9 @@ impl PanelSpace {
         mut windows_left: Vec<(usize, Window, Option<u32>)>,
         mut windows_center: Vec<(usize, Window, Option<u32>)>,
         mut windows_right: Vec<(usize, Window, Option<u32>)>,
-        left_overflow_button: Option<OverflowButtonElement>,
-        right_overflow_button: Option<OverflowButtonElement>,
-        center_overflow_button: Option<OverflowButtonElement>,
+        mut left_overflow_button: Option<OverflowButtonElement>,
+        mut right_overflow_button: Option<OverflowButtonElement>,
+        mut center_overflow_button: Option<OverflowButtonElement>,
     ) -> anyhow::Result<()> {
         self.space.refresh();
         let mut bg_color = self.bg_color();
@@ -247,6 +252,14 @@ impl PanelSpace {
             PanelAnchor::Top | PanelAnchor::Bottom => (self.dimensions.h, self.dimensions.w),
         };
         let is_dock = !self.config.expand_to_edges();
+        if is_dock {
+            if let Some(left_button) = left_overflow_button.take() {
+                self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(left_button));
+            }
+            if let Some(right_button) = right_overflow_button.take() {
+                self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(right_button));
+            }
+        }
 
         let has_sides = !windows_left.is_empty()
             || !windows_right.is_empty()
@@ -433,9 +446,9 @@ impl PanelSpace {
         .min(layer_major as f64);
 
         let center_overflow = (center_sum - target_center_len) as i32;
-        if center_overflow <= 0 {
+        if center_overflow < 0 {
             // check if it can be expanded
-            self.relax_overflow_center(center_overflow.abs() as u32)
+            self.relax_overflow_center(center_overflow.abs() as u32, &mut center_overflow_button)
         } else if center_overflow > 0 {
             let overflow = self.shrink_center((center_sum - target_center_len) as u32);
             bail!("overflow: {}", overflow)
@@ -444,7 +457,7 @@ impl PanelSpace {
         let left_overflow = (left_sum - target_left_len) as i32;
         if left_overflow <= 0 {
             // check if it can be expanded
-            self.relax_overflow_left(left_overflow.abs() as u32);
+            self.relax_overflow_left(left_overflow.abs() as u32, &mut left_overflow_button);
         } else if left_overflow > 0 {
             let overflow = self.shrink_left(left_overflow as u32);
             bail!("overflow: {}", overflow)
@@ -453,7 +466,7 @@ impl PanelSpace {
         let right_overflow = (right_sum - target_right_len) as i32;
         if right_overflow <= 0 {
             // check if it can be expanded
-            self.relax_overflow_right(right_overflow.abs() as u32);
+            self.relax_overflow_right(right_overflow.abs() as u32, &mut right_overflow_button);
         } else {
             let overflow = self.shrink_right(right_overflow as u32);
             bail!("overflow: {}", overflow)
@@ -816,7 +829,7 @@ impl PanelSpace {
                         t.wl_surface().client().is_some_and(|w_client| w_client == c.client)
                     })
                 {
-                    Some((w.clone(), c.minimize_priority.unwrap_or_default()))
+                    Some((w.clone(), c.shrink_priority.unwrap_or_default()))
                 } else {
                     return None;
                 }
@@ -826,7 +839,7 @@ impl PanelSpace {
             };
             if c.shrink_min_size.is_some_and(|s| s > 0) {
                 overflow_partition.shrinkable.push((w.0, w.1, c.shrink_min_size.unwrap()));
-            } else {
+            } else if c.shrink_priority.is_some() {
                 overflow_partition.movable.push(w);
             }
         }
@@ -1123,7 +1136,11 @@ impl PanelSpace {
         extra_space
     }
 
-    fn relax_overflow_left(&mut self, extra_space: u32) {
+    fn relax_overflow_left(
+        &mut self,
+        extra_space: u32,
+        left_overflow_button: &mut Option<IcedElement<OverflowButton>>,
+    ) {
         let left = self.clients_left.lock().unwrap();
         let mut clients = self.shrinkable_clients(left.iter());
         drop(left);
@@ -1138,20 +1155,9 @@ impl PanelSpace {
                 &mut self.overflow_left,
                 suggested_size,
             );
-            if self.overflow_left.elements().count() <= 0 && had_extra {
-                let button = self.space
-                    .elements()
-                    // find with left btn id
-                    .find(|e| {
-                        if let CosmicMappedInternal::OverflowButton(b) = e {
-                            b.with_program(|p| p.id == self.left_overflow_button_id)
-                        } else {
-                            false
-                        }
-                    })
-                    .cloned();
-                if let Some(overflow_button) = button {
-                    self.space.unmap_elem(&overflow_button);
+            if self.overflow_left.elements().count() <= 0 {
+                if let Some(overflow_button) = left_overflow_button.take() {
+                    self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(overflow_button));
                     self.space.refresh();
                 }
             }
@@ -1160,7 +1166,11 @@ impl PanelSpace {
         }
     }
 
-    fn relax_overflow_center(&mut self, extra_space: u32) {
+    fn relax_overflow_center(
+        &mut self,
+        extra_space: u32,
+        center_overflow_button: &mut Option<IcedElement<OverflowButton>>,
+    ) {
         let center: MutexGuard<Vec<PanelClient>> = self.clients_center.lock().unwrap();
         let mut clients = self.shrinkable_clients(center.iter());
         drop(center);
@@ -1175,20 +1185,9 @@ impl PanelSpace {
                 &mut self.overflow_center,
                 suggested_size,
             );
-            if self.overflow_center.elements().count() <= 0 && had_extra {
-                let button = self.space
-                    .elements()
-                    // find with center btn id
-                    .find(|e| {
-                        if let CosmicMappedInternal::OverflowButton(b) = e {
-                            b.with_program(|p| p.id == self.center_overflow_button_id)
-                        } else {
-                            false
-                        }
-                    })
-                    .cloned();
-                if let Some(overflow_button) = button {
-                    self.space.unmap_elem(&overflow_button);
+            if self.overflow_center.elements().count() <= 0 {
+                if let Some(overflow_button) = center_overflow_button.take() {
+                    self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(overflow_button));
                     self.space.refresh();
                 }
             }
@@ -1197,7 +1196,11 @@ impl PanelSpace {
         }
     }
 
-    fn relax_overflow_right(&mut self, extra_space: u32) {
+    fn relax_overflow_right(
+        &mut self,
+        extra_space: u32,
+        right_overflow_button: &mut Option<IcedElement<OverflowButton>>,
+    ) {
         let right = self.clients_right.lock().unwrap();
         let mut clients = self.shrinkable_clients(right.iter());
         drop(right);
@@ -1212,19 +1215,8 @@ impl PanelSpace {
                 suggested_size,
             );
             if self.overflow_right.elements().count() <= 0 {
-                let button = self.space
-                    .elements()
-                    // find with right btn id
-                    .find(|e| {
-                        if let CosmicMappedInternal::OverflowButton(b) = e {
-                            b.with_program(|p| p.id == self.right_overflow_button_id)
-                        } else {
-                            false
-                        }
-                    })
-                    .cloned();
-                if let Some(overflow_button) = button {
-                    self.space.unmap_elem(&overflow_button);
+                if let Some(overflow_button) = right_overflow_button.take() {
+                    self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(overflow_button));
                     self.space.refresh();
                 }
             }

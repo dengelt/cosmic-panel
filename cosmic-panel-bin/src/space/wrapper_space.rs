@@ -1481,49 +1481,7 @@ impl WrapperSpace for PanelSpace {
                     });
                 }
 
-                let overflow = self
-                    .overflow_left
-                    .elements()
-                    .cloned()
-                    .chain(self.overflow_center.elements().cloned())
-                    .chain(self.overflow_right.elements().cloned())
-                    .collect::<Vec<_>>();
-
-                for e in overflow {
-                    self.overflow_left.unmap_elem(&e);
-                    self.overflow_center.unmap_elem(&e);
-                    self.overflow_right.unmap_elem(&e);
-                    let window = match e {
-                        PopupMappedInternal::Window(w) => w,
-                        _ => continue,
-                    };
-                    let Some(wl_surface) = window.wl_surface() else {
-                        continue;
-                    };
-                    with_states(&wl_surface, |states| {
-                        with_fractional_scale(states, |fractional_scale| {
-                            fractional_scale.set_preferred_scale(scale);
-                        });
-                    });
-                    self.space.map_element(CosmicMappedInternal::Window(window), (0, 0), false);
-                }
-                // remove all button elements from the space
-                let buttons = self
-                    .space
-                    .elements()
-                    .cloned()
-                    .filter_map(|e| {
-                        if let CosmicMappedInternal::OverflowButton(b) = e {
-                            Some(b)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<_>>();
-
-                for b in buttons {
-                    self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(b.clone()));
-                }
+                self.reset_overflow();
             }
 
             // request a new size for the layer surface with suggested cross-wise size and 0

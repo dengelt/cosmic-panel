@@ -51,7 +51,7 @@ use smithay::{
             surface::EGLSurface,
             EGLContext,
         },
-        renderer::{damage::OutputDamageTracker, gles::GlesRenderer, Bind, Unbind},
+        renderer::{damage::OutputDamageTracker, element, gles::GlesRenderer, Bind, Unbind},
     },
     desktop::{PopupManager, Space, Window},
     output::Output,
@@ -61,6 +61,8 @@ use smithay::{
     },
     utils::{Logical, Rectangle, Serial, Size, SERIAL_COUNTER},
     wayland::{
+        compositor::with_states,
+        fractional_scale::with_fractional_scale,
         seat::WaylandFocus,
         shell::xdg::{PopupSurface, PositionerState},
     },
@@ -1268,6 +1270,10 @@ impl PanelSpace {
             }
         }
 
+        if self.config.expand_to_edges != config.expand_to_edges {
+            self.reset_overflow();
+        }
+
         if needs_commit {
             if let Some(l) = self.layer.as_ref() {
                 l.commit();
@@ -1307,6 +1313,68 @@ impl PanelSpace {
         self.config = config;
 
         self.clear();
+    }
+
+    pub fn reset_overflow(&mut self) {
+        // re-map all windows to the main space from overflow
+        // remove all overflow buttons and popups
+        let overflow = self
+            .overflow_left
+            .elements()
+            .cloned()
+            .chain(self.overflow_center.elements().cloned())
+            .chain(self.overflow_right.elements().cloned())
+            .collect::<Vec<_>>();
+
+        for e in overflow {
+            self.overflow_left.unmap_elem(&e);
+            self.overflow_center.unmap_elem(&e);
+            self.overflow_right.unmap_elem(&e);
+            let window = match e {
+                PopupMappedInternal::Window(w) => w,
+                _ => continue,
+            };
+            let Some(wl_surface) = window.wl_surface() else {
+                continue;
+            };
+            with_states(&wl_surface, |states| {
+                with_fractional_scale(states, |fractional_scale| {
+                    fractional_scale.set_preferred_scale(self.scale);
+                });
+            });
+            self.space.map_element(CosmicMappedInternal::Window(window), (0, 0), false);
+        }
+        // remove all button elements from the space
+        let buttons = self
+            .space
+            .elements()
+            .cloned()
+            .filter_map(|e| {
+                if let CosmicMappedInternal::OverflowButton(b) = e {
+                    Some(b)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        for b in buttons {
+            self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(b.clone()));
+        }
+
+        // send None for configure to force re-configure all windows
+        let elements = self.space.elements().cloned().collect::<Vec<_>>();
+        for e in elements {
+            if let CosmicMappedInternal::Window(w) = e {
+                if let Some(t) = w.toplevel() {
+                    t.with_pending_state(|s| {
+                        s.size = None;
+                    });
+                    t.send_pending_configure();
+                }
+            }
+        }
+        self.close_popups([]);
     }
 
     pub fn set_maximized(&mut self, maximized: bool, config: CosmicPanelConfig, opacity: f32) {
