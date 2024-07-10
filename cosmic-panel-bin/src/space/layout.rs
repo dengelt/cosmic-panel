@@ -67,10 +67,6 @@ impl PanelSpace {
                 constrained.h >= size.h && constrained.w >= size.w
             } {
                 self.space.map_element(CosmicMappedInternal::Window(w.clone()), (0, 0), false);
-                if let Some(t) = w.toplevel() {
-                    t.with_pending_state(|pending| pending.size = None);
-                    t.send_configure();
-                }
                 w.output_enter(&output, Rectangle::default())
             } else {
                 self.unmapped.push(w);
@@ -889,7 +885,7 @@ impl PanelSpace {
 
         let shrinkable = &mut clients.shrinkable;
         for (w, _, min_units) in shrinkable.iter_mut() {
-            if overflow < unit_size {
+            if overflow == 0 {
                 break;
             }
             let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
@@ -900,6 +896,7 @@ impl PanelSpace {
             if diff == 0 {
                 continue;
             }
+            tracing::info!("Shrinking window {:?} by {}", w.bbox(), diff);
 
             if let Some(t) = w.toplevel() {
                 t.with_pending_state(|s| {
@@ -1144,10 +1141,9 @@ impl PanelSpace {
         let left = self.clients_left.lock().unwrap();
         let mut clients = self.shrinkable_clients(left.iter());
         drop(left);
+        let suggested_size = self.config.size.get_applet_icon_size(true) as u32
+            + self.config.size.get_applet_padding(true) as u32 * 2;
         if clients.shrinkable_is_relaxed(self.config.is_horizontal()) {
-            let suggested_size = self.config.size.get_applet_icon_size(true) as u32
-                + self.config.size.get_applet_padding(true) as u32 * 2;
-            let had_extra = self.overflow_left.elements().count() > 0;
             Self::move_from_overflow(
                 extra_space,
                 self.config.is_horizontal(),
@@ -1161,7 +1157,7 @@ impl PanelSpace {
                     self.space.refresh();
                 }
             }
-        } else {
+        } else if extra_space > suggested_size {
             self.relax_overflow_clients(&mut clients);
         }
     }
