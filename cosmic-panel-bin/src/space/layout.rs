@@ -450,22 +450,24 @@ impl PanelSpace {
             bail!("overflow: {}", overflow)
         }
 
-        let left_overflow = (left_sum - target_left_len) as i32;
-        if left_overflow <= 0 {
-            // check if it can be expanded
-            self.relax_overflow_left(left_overflow.abs() as u32, &mut left_overflow_button);
-        } else if left_overflow > 0 {
-            let overflow = self.shrink_left(left_overflow as u32);
-            bail!("overflow: {}", overflow)
-        }
+        if !is_dock {
+            let left_overflow = (left_sum - target_left_len) as i32;
+            if left_overflow <= 0 {
+                // check if it can be expanded
+                self.relax_overflow_left(left_overflow.abs() as u32, &mut left_overflow_button);
+            } else if left_overflow > 0 {
+                let overflow = self.shrink_left(left_overflow as u32);
+                bail!("overflow: {}", overflow)
+            }
 
-        let right_overflow = (right_sum - target_right_len) as i32;
-        if right_overflow <= 0 {
-            // check if it can be expanded
-            self.relax_overflow_right(right_overflow.abs() as u32, &mut right_overflow_button);
-        } else {
-            let overflow = self.shrink_right(right_overflow as u32);
-            bail!("overflow: {}", overflow)
+            let right_overflow = (right_sum - target_right_len) as i32;
+            if right_overflow <= 0 {
+                // check if it can be expanded
+                self.relax_overflow_right(right_overflow.abs() as u32, &mut right_overflow_button);
+            } else {
+                let overflow = self.shrink_right(right_overflow as u32);
+                bail!("overflow: {}", overflow)
+            }
         }
 
         // update input region of panel when list changes
@@ -888,10 +890,12 @@ impl PanelSpace {
             if overflow == 0 {
                 break;
             }
-            let size = w.bbox().size.to_f64().downscale(self.scale).to_i32_round();
+            let size = w.bbox().size.to_f64().downscale(self.scale);
             let major_dim = if self.config.is_horizontal() { size.w } else { size.h };
-            let unit_size = (major_dim as f32 / unit_size as f32).ceil() as u32;
-            let new_dim = (major_dim as u32).saturating_sub(overflow).max(*min_units * unit_size);
+            if major_dim < *min_units as f64 * unit_size as f64 {
+                continue;
+            }
+            let new_dim = (major_dim as u32).saturating_sub(overflow.max(*min_units * unit_size));
             let diff = (major_dim as u32).saturating_sub(new_dim);
             if diff == 0 {
                 continue;
@@ -901,10 +905,12 @@ impl PanelSpace {
             if let Some(t) = w.toplevel() {
                 t.with_pending_state(|s| {
                     if self.config.is_horizontal() {
-                        s.size = Some((new_dim as i32, size.h).into());
+                        s.size = Some((new_dim as i32, s.size.unwrap_or_default().h as i32).into());
                     } else {
-                        s.size = Some((size.w, new_dim as i32).into());
+                        s.size = Some((s.size.unwrap_or_default().w as i32, new_dim as i32).into());
                     }
+                    s.size =
+                        Some(s.size.as_mut().unwrap().to_f64().upscale(self.scale).to_i32_round());
                 });
                 t.send_pending_configure();
                 overflow = overflow.saturating_sub(diff);
@@ -1158,7 +1164,7 @@ impl PanelSpace {
                 }
             }
         } else if extra_space > suggested_size {
-            self.relax_overflow_clients(&mut clients);
+            self.relax_overflow_clients(&mut clients, extra_space);
         }
     }
 
@@ -1173,7 +1179,6 @@ impl PanelSpace {
         if clients.shrinkable_is_relaxed(self.config.is_horizontal()) {
             let suggested_size = self.config.size.get_applet_icon_size(true) as u32
                 + self.config.size.get_applet_padding(true) as u32 * 2;
-            let had_extra = self.overflow_center.elements().count() > 0;
             Self::move_from_overflow(
                 extra_space,
                 self.config.is_horizontal(),
@@ -1188,7 +1193,7 @@ impl PanelSpace {
                 }
             }
         } else {
-            self.relax_overflow_clients(&mut clients);
+            self.relax_overflow_clients(&mut clients, extra_space);
         }
     }
 
@@ -1199,7 +1204,7 @@ impl PanelSpace {
     ) {
         let right = self.clients_right.lock().unwrap();
         let mut clients = self.shrinkable_clients(right.iter());
-        drop(right);
+
         if clients.shrinkable_is_relaxed(self.config.is_horizontal()) {
             let suggested_size = self.config.size.get_applet_icon_size(true) as u32
                 + self.config.size.get_applet_padding(true) as u32 * 2;
@@ -1217,24 +1222,34 @@ impl PanelSpace {
                 }
             }
         } else {
-            self.relax_overflow_clients(&mut clients);
+            self.relax_overflow_clients(&mut clients, extra_space);
         }
     }
 
-    fn relax_overflow_clients(&self, clients: &mut OverflowClientPartition) {
+    fn relax_overflow_clients(&self, clients: &mut OverflowClientPartition, mut extra_space: u32) {
         for (w, ..) in clients.shrinkable.drain(..) {
+            if extra_space == 0 {
+                break;
+            }
+            // todo sort by priority
             let Some(t) = w.toplevel() else {
                 continue;
             };
-            let suggested_size = self.config.size.get_applet_icon_size(true) as i32
-                + self.config.size.get_applet_padding(true) as i32 * 2;
+
+            let expand = extra_space.min(self.dimensions.w as u32) as i32;
+            tracing::info!("Relaxing overflow client {expand}");
+            extra_space = extra_space.saturating_sub(extra_space);
             let is_horizontal = self.config.is_horizontal();
+            // cap the increased size to the length of the output
+
             t.with_pending_state(|state| {
-                state.size = Some(if is_horizontal {
-                    (0, suggested_size).into()
-                } else {
-                    (suggested_size, 0).into()
-                });
+                if let Some(size) = state.size {
+                    state.size = Some(if is_horizontal {
+                        (size.w.saturating_add(expand).max(self.dimensions.w as i32), size.h).into()
+                    } else {
+                        (size.w, size.h.saturating_add(expand).max(self.dimensions.h as i32)).into()
+                    });
+                }
             });
             t.send_pending_configure();
         }
@@ -1316,6 +1331,7 @@ pub struct OverflowClientPartition {
     /// windows for clients that can be moved to the overflow popup, but not
     /// shrunk
     pub(crate) movable: Vec<(Window, u32)>,
+    pub suggested_size: u32,
 }
 
 impl OverflowClientPartition {
@@ -1323,13 +1339,23 @@ impl OverflowClientPartition {
         self.shrinkable.is_empty() || {
             self.shrinkable.iter().all(|(w, ..)| {
                 w.toplevel().is_some_and(|t| {
-                    t.with_pending_state(|s| {
-                        if is_horizontal {
-                            s.size.map(|s| s.w as u32).unwrap_or_default().saturating_sub(1) == 0
-                        } else {
-                            s.size.map(|s| s.h as u32).unwrap_or_default().saturating_sub(1) == 0
-                        }
-                    })
+                    let state = t.current_state();
+                    let cur_size = w.bbox().size;
+                    if is_horizontal {
+                        state.size.is_none()
+                            || state.size.is_some_and(|s| {
+                                s.w == 0
+                                    || cur_size.w.saturating_sub(s.w)
+                                        > 2 * self.suggested_size as i32
+                            })
+                    } else {
+                        state.size.is_none()
+                            || state.size.is_some_and(|s| {
+                                s.h == 0
+                                    || cur_size.h.saturating_sub(s.h)
+                                        > 2 * self.suggested_size as i32
+                            })
+                    }
                 })
             })
         }
