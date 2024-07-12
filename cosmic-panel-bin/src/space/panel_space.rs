@@ -287,6 +287,7 @@ pub(crate) struct PanelSpace {
     pub center_overflow_popup_id: id::Id,
     pub right_overflow_popup_id: id::Id,
     pub overflow_popup: Option<(PanelPopup, OverflowSection)>,
+    pub remap_attempts: u32,
 }
 
 impl PanelSpace {
@@ -363,6 +364,7 @@ impl PanelSpace {
             center_overflow_popup_id: id::Id::new(format!("{}-center-overflow-popup", name)),
             right_overflow_popup_id: id::Id::new(format!("{}-right-overflow-popup", name)),
             overflow_popup: None,
+            remap_attempts: 0,
         }
     }
 

@@ -40,6 +40,7 @@ use tracing::{error, info};
 
 impl PanelSpace {
     pub(crate) fn layout_(&mut self) -> anyhow::Result<()> {
+        self.remap_attempts = self.remap_attempts.saturating_sub(1);
         let gap = self.gap();
 
         let make_indices_contiguous = |windows: &mut Vec<(usize, Window, Option<u32>)>| {
@@ -70,12 +71,14 @@ impl PanelSpace {
             if w.alive() && { constrained.h >= size.h && constrained.w >= size.w } {
                 info!("Remapping window {:?} {:?}", size, constrained);
                 self.space.map_element(CosmicMappedInternal::Window(w.clone()), (0, 0), false);
-                w.output_enter(&output, Rectangle::default())
+                w.output_enter(&output, Rectangle::default());
+                if let Some(t) = w.toplevel() {
+                    t.with_pending_state(|s| {
+                        s.size = Some(constrained);
+                    });
+                    t.send_configure();
+                }
             } else {
-                // error!(
-                //     "Window {size:?} is too large for what panel configuration allows \
-                //      {constrained:?}. It will remain unmapped.",
-                // );
                 if let Some(t) = w.toplevel() {
                     t.with_pending_state(|s| {
                         s.size = Some(constrained);
@@ -152,6 +155,9 @@ impl PanelSpace {
                 }
             })
             .collect_vec();
+        if !to_unmap.is_empty() {
+            self.remap_attempts = 3;
+        }
         for w in to_unmap {
             self.space.unmap_elem(&CosmicMappedInternal::Window(w.clone()));
             self.unmapped.push(w);
@@ -224,14 +230,18 @@ impl PanelSpace {
                 .collect_vec();
         }
 
-        self.layout(
+        let res = self.layout(
             windows_left,
             windows_center,
             windows_right,
             left_overflow_button,
             right_overflow_button,
             center_overflow_button,
-        )
+        );
+        if let Err(e) = res.as_ref() {
+            error!("Error in layout: {:?}", e);
+        }
+        res
     }
 
     pub(crate) fn layout(
@@ -864,7 +874,7 @@ impl PanelSpace {
         let left = self.clients_left.lock().unwrap();
         let mut clients = self.shrinkable_clients(left.iter());
         drop(left);
-        self.shrink_clients(overflow, &mut clients, OverflowSection::Left)
+        self.shrink_clients(overflow, &mut clients, OverflowSection::Left, false)
     }
 
     fn shrink_center(&mut self, overflow: u32) -> u32 {
@@ -880,14 +890,14 @@ impl PanelSpace {
         drop(g);
         drop(left_g);
         drop(right_g);
-        self.shrink_clients(overflow, &mut clients, OverflowSection::Center)
+        self.shrink_clients(overflow, &mut clients, OverflowSection::Center, false)
     }
 
     fn shrink_right(&mut self, overflow: u32) -> u32 {
         let right = self.clients_right.lock().unwrap();
         let mut clients = self.shrinkable_clients(right.iter());
         drop(right);
-        self.shrink_clients(overflow, &mut clients, OverflowSection::Right)
+        self.shrink_clients(overflow, &mut clients, OverflowSection::Right, false)
     }
 
     fn shrink_clients(
@@ -895,6 +905,7 @@ impl PanelSpace {
         mut overflow: u32,
         clients: &mut OverflowClientPartition,
         section: OverflowSection,
+        force_smaller: bool,
     ) -> u32 {
         let unit_size = self.config.size.get_applet_icon_size_with_padding(true);
 
@@ -908,8 +919,12 @@ impl PanelSpace {
             if major_dim < min_units.to_pixels(unit_size) as f64 {
                 continue;
             }
-            let new_dim =
-                (major_dim as u32).saturating_sub(overflow).max(min_units.to_pixels(unit_size));
+            let new_dim = (major_dim as u32).saturating_sub(overflow);
+            let new_dim = if force_smaller || new_dim >= min_units.to_pixels(unit_size) {
+                new_dim
+            } else {
+                min_units.to_pixels(unit_size)
+            };
             let diff = (major_dim as u32).saturating_sub(new_dim);
             if diff == 0 {
                 continue;
@@ -929,12 +944,19 @@ impl PanelSpace {
             }
         }
         if overflow > 0 {
-            return self.move_to_overflow(
+            overflow = self.move_to_overflow(
                 overflow,
                 self.config.is_horizontal(),
                 clients.clone(),
                 section,
             );
+        }
+        if overflow > 0 && !force_smaller {
+            tracing::warn!(
+                "Overflow not resolved {}. Forcing lowest priority shrinkable applets to be smaller than configured...",
+                overflow
+            );
+            return self.shrink_clients(overflow, clients, section, true);
         }
         overflow
     }
@@ -1239,6 +1261,9 @@ impl PanelSpace {
     }
 
     fn relax_overflow_clients(&self, clients: &mut OverflowClientPartition, mut extra_space: u32) {
+        if self.remap_attempts > 0 {
+            return;
+        }
         for (w, ..) in clients.constrained_shrinkables(self.config.is_horizontal()).drain(..).rev()
         {
             let expand = extra_space.min(self.dimensions.w as u32) as i32;

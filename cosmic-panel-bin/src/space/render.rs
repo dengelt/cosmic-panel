@@ -114,6 +114,7 @@ impl PanelSpace {
         }
 
         if self.is_dirty && self.has_frame {
+            tracing::trace!("Rendering space");
             let my_renderer = match self.damage_tracked_renderer.as_mut() {
                 Some(r) => r,
                 None => return Ok(()),

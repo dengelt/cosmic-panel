@@ -190,6 +190,7 @@ impl WrapperSpace for PanelSpace {
                 }
             }
         }
+
         self.close_popups(clear_exclude);
         let c_popup = popup::Popup::from_surface(
             parent.as_ref().map(|p| p.xdg_surface()),
