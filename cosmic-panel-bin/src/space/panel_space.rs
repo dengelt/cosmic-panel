@@ -109,9 +109,24 @@ pub struct PanelClient {
     pub requests_wayland_display: Option<bool>,
     pub is_notification_applet: Option<bool>,
     pub shrink_priority: Option<u32>,
-    pub shrink_min_size: Option<u32>,
+    pub shrink_min_size: Option<ClientShrinkSize>,
     /// If there is an existing popup, this applet with be pressed when hovered.
     pub auto_popup_hover_press: Option<AppletAutoClickAnchor>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum ClientShrinkSize {
+    AppletUnit(u32),
+    Pixel(u32),
+}
+
+impl ClientShrinkSize {
+    pub fn to_pixels(&self, applet_size: u32) -> u32 {
+        match self {
+            Self::AppletUnit(units) => applet_size * units,
+            Self::Pixel(pixels) => *pixels,
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]

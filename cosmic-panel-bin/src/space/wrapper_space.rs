@@ -10,6 +10,7 @@ use std::{
 
 use crate::{
     iced::elements::{target::SpaceTarget, PopupMappedInternal},
+    space::panel_space::ClientShrinkSize,
     space_container::SpaceContainer,
     xdg_shell_wrapper::{
         client_state::ClientFocus,
@@ -417,7 +418,8 @@ impl WrapperSpace for PanelSpace {
                                     Some(entry.desktop_entry("X-HostWaylandDisplay").is_some());
                                 panel_client.shrink_min_size = entry
                                     .desktop_entry("X-OverflowMinSize")
-                                    .and_then(|x| x.parse::<u32>().ok());
+                                    .and_then(|x| x.parse::<u32>().ok())
+                                    .map(|units| ClientShrinkSize::AppletUnit(units));
                                 panel_client.shrink_priority = entry
                                     .desktop_entry("X-OverflowPriority")
                                     .and_then(|x| x.parse::<u32>().ok());
@@ -622,10 +624,13 @@ impl WrapperSpace for PanelSpace {
                                     return;
                                 };
                                 if let Err(err) = pman
-                                    .update_process_env(&key, vec![(
-                                        "COSMIC_NOTIFICATIONS".to_string(),
-                                        fd.as_raw_fd().to_string(),
-                                    )])
+                                    .update_process_env(
+                                        &key,
+                                        vec![(
+                                            "COSMIC_NOTIFICATIONS".to_string(),
+                                            fd.as_raw_fd().to_string(),
+                                        )],
+                                    )
                                     .await
                                 {
                                     error!("Failed to update process env: {}", err);
@@ -1473,12 +1478,79 @@ impl WrapperSpace for PanelSpace {
                 if let Some(viewport) = self.layer_viewport.as_ref() {
                     viewport.set_destination(self.actual_size.w.max(1), self.actual_size.h.max(1));
                 }
-                for surface in self.space.elements().filter_map(|e| e.wl_surface().clone()) {
-                    with_states(&surface, |states| {
+                for surface in self.space.elements().filter_map(|e| e.toplevel().clone()) {
+                    surface.with_pending_state(|s| {
+                        s.size = None;
+                    });
+                    with_states(surface.wl_surface(), |states| {
                         with_fractional_scale(states, |fractional_scale| {
                             fractional_scale.set_preferred_scale(scale);
                         });
                     });
+                    surface.send_configure();
+                }
+
+                for w in &self.unmapped {
+                    let Some(toplevel) = w.toplevel().clone() else {
+                        continue;
+                    };
+                    toplevel.with_pending_state(|s| {
+                        s.size = None;
+                    });
+                    with_states(toplevel.wl_surface(), |states| {
+                        with_fractional_scale(states, |fractional_scale| {
+                            fractional_scale.set_preferred_scale(scale);
+                        });
+                    });
+                    toplevel.send_configure();
+                    self.space.map_element(CosmicMappedInternal::Window(w.clone()), (0, 0), false);
+                }
+
+                for o in self
+                    .overflow_left
+                    .elements()
+                    .chain(self.overflow_center.elements().chain(self.overflow_right.elements()))
+                {
+                    let w = match o {
+                        PopupMappedInternal::Window(w) => w,
+                        _ => continue,
+                    };
+                    let Some(toplevel) = o.toplevel().clone() else {
+                        continue;
+                    };
+                    toplevel.with_pending_state(|s| {
+                        s.size = None;
+                    });
+                    with_states(toplevel.wl_surface(), |states| {
+                        with_fractional_scale(states, |fractional_scale| {
+                            fractional_scale.set_preferred_scale(scale);
+                        });
+                    });
+                    toplevel.send_configure();
+                    self.space.map_element(CosmicMappedInternal::Window(w.clone()), (0, 0), false);
+                }
+
+                let left = self.overflow_left.elements().cloned().collect::<Vec<_>>();
+                for e in left {
+                    self.overflow_left.unmap_elem(&e);
+                }
+                let center = self.overflow_center.elements().cloned().collect::<Vec<_>>();
+                for e in center {
+                    self.overflow_center.unmap_elem(&e);
+                }
+                let right = self.overflow_right.elements().cloned().collect::<Vec<_>>();
+                for e in right {
+                    self.overflow_right.unmap_elem(&e);
+                }
+                // remove all buttons from space
+                let buttons = self
+                    .space
+                    .elements()
+                    .cloned()
+                    .filter(|b| matches!(b, CosmicMappedInternal::OverflowButton(_)))
+                    .collect::<Vec<_>>();
+                for e in buttons {
+                    self.space.unmap_elem(&e);
                 }
 
                 self.reset_overflow();
