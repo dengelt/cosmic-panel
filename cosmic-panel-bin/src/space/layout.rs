@@ -79,12 +79,6 @@ impl PanelSpace {
                     t.send_configure();
                 }
             } else {
-                if let Some(t) = w.toplevel() {
-                    t.with_pending_state(|s| {
-                        s.size = Some(constrained);
-                    });
-                    t.send_configure();
-                }
                 self.unmapped.push(w);
             }
         }
@@ -953,7 +947,8 @@ impl PanelSpace {
         }
         if overflow > 0 && !force_smaller {
             tracing::warn!(
-                "Overflow not resolved {}. Forcing lowest priority shrinkable applets to be smaller than configured...",
+                "Overflow not resolved {}. Forcing lowest priority shrinkable applets to be \
+                 smaller than configured...",
                 overflow
             );
             return self.shrink_clients(overflow, clients, section, true);
@@ -1189,7 +1184,7 @@ impl PanelSpace {
                 suggested_size,
                 self.scale,
             );
-            if self.overflow_left.elements().count() <= 0 {
+            if self.overflow_left.elements().count() <= 1 {
                 if let Some(overflow_button) = left_overflow_button.take() {
                     self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(overflow_button));
                     self.space.refresh();
@@ -1219,7 +1214,7 @@ impl PanelSpace {
                 suggested_size,
                 self.scale,
             );
-            if self.overflow_center.elements().count() <= 0 {
+            if self.overflow_center.elements().count() <= 1 {
                 if let Some(overflow_button) = center_overflow_button.take() {
                     self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(overflow_button));
                     self.space.refresh();
@@ -1249,7 +1244,7 @@ impl PanelSpace {
                 suggested_size,
                 self.scale,
             );
-            if self.overflow_right.elements().count() <= 0 {
+            if self.overflow_right.elements().count() <= 1 {
                 if let Some(overflow_button) = right_overflow_button.take() {
                     self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(overflow_button));
                     self.space.refresh();
@@ -1279,8 +1274,6 @@ impl PanelSpace {
             let Some(t) = w.toplevel() else {
                 continue;
             };
-
-            // expand = (expand as f64 / self.scale).round() as i32;
 
             let is_horizontal: bool = self.config.is_horizontal();
 
