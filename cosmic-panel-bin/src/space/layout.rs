@@ -964,13 +964,13 @@ impl PanelSpace {
         clients: OverflowClientPartition,
         section: OverflowSection,
     ) -> u32 {
+        info!("Moving clients to overflow space {:?} {overflow}", section);
         let overflow_space = match section {
             OverflowSection::Left => &mut self.overflow_left,
             OverflowSection::Center => &mut self.overflow_center,
             OverflowSection::Right => &mut self.overflow_right,
         };
         let mut overflow_cnt = overflow_space.elements().count();
-        let had_overflow_prev = overflow_cnt > 0;
         let applet_size_unit = self.config.size.get_applet_icon_size(true)
             + 2 * self.config.size.get_applet_padding(true) as u32;
         let spacing = self.config.spacing;
@@ -1072,9 +1072,26 @@ impl PanelSpace {
                 self.scale as f32,
             ))
         };
+
         let count = overflow_space.elements().count();
-        if !had_overflow_prev && count > 0 {
-            // XXX the location will be adjusted later so this is ok
+        if let Some(overflow_popup) = popup {
+            let e = new_popup(count);
+            let output = self.output.as_ref().map(|o| &o.1).unwrap();
+
+            e.output_enter(output, Default::default());
+            overflow_space.unmap_elem(&overflow_popup);
+            overflow_space.map_element(e, (0, 0), false);
+        } else {
+            let output = self.output.as_ref().map(|o| &o.1).unwrap();
+            let new_popup = new_popup(count);
+            new_popup.output_enter(&output, Default::default());
+            overflow_space.map_element(new_popup, (0, 0), false);
+
+            self.is_dirty = true;
+            self.space.refresh();
+        }
+
+        if self.space.elements().all(|e| !matches!(e, CosmicMappedInternal::OverflowButton(_))) {
             let overflow_button_loc = (0, 0);
             let id = match section {
                 OverflowSection::Left => self.left_overflow_button_id.clone(),
@@ -1103,26 +1120,14 @@ impl PanelSpace {
             );
             let output = self.output.as_ref().map(|o| &o.1).unwrap();
             e.output_enter(&output, Default::default());
-            let new_popup = new_popup(count);
-            new_popup.output_enter(&output, Default::default());
-            overflow_space.map_element(new_popup, (0, 0), false);
             self.space.map_element(
                 CosmicMappedInternal::OverflowButton(e),
                 overflow_button_loc,
                 false,
             );
-
-            self.is_dirty = true;
             self.space.refresh();
-        } else if let Some(overflow_popup) = popup {
-            let e = new_popup(count);
-            let output = self.output.as_ref().map(|o| &o.1).unwrap();
-
-            e.output_enter(output, Default::default());
-            overflow_space.unmap_elem(&overflow_popup);
-            overflow_space.map_element(e, (0, 0), false);
+            self.is_dirty = true;
         }
-
         overflow
     }
 
@@ -1184,7 +1189,7 @@ impl PanelSpace {
                 suggested_size,
                 self.scale,
             );
-            if self.overflow_left.elements().count() <= 1 {
+            if self.overflow_left.elements().all(|e| matches!(e, PopupMappedInternal::Popup(_))) {
                 if let Some(overflow_button) = left_overflow_button.take() {
                     self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(overflow_button));
                     self.space.refresh();
@@ -1214,7 +1219,7 @@ impl PanelSpace {
                 suggested_size,
                 self.scale,
             );
-            if self.overflow_center.elements().count() <= 1 {
+            if self.overflow_center.elements().all(|e| matches!(e, PopupMappedInternal::Popup(_))) {
                 if let Some(overflow_button) = center_overflow_button.take() {
                     self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(overflow_button));
                     self.space.refresh();
@@ -1244,7 +1249,7 @@ impl PanelSpace {
                 suggested_size,
                 self.scale,
             );
-            if self.overflow_right.elements().count() <= 1 {
+            if self.overflow_right.elements().all(|e| matches!(e, PopupMappedInternal::Popup(_))) {
                 if let Some(overflow_button) = right_overflow_button.take() {
                     self.space.unmap_elem(&CosmicMappedInternal::OverflowButton(overflow_button));
                     self.space.refresh();
