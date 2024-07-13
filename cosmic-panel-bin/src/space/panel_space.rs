@@ -123,7 +123,8 @@ pub enum ClientShrinkSize {
 impl ClientShrinkSize {
     pub fn to_pixels(&self, applet_size: u32) -> u32 {
         match self {
-            Self::AppletUnit(units) => applet_size * units,
+            // TODO get spacing / padding from the theme or panel config?
+            Self::AppletUnit(units) => 4 + applet_size * units + 4 * units.saturating_sub(1),
             Self::Pixel(pixels) => *pixels,
         }
     }

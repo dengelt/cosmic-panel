@@ -138,7 +138,7 @@ impl PanelSpace {
                 let unmap = constrained.h < size.h || constrained.w < size.w;
 
                 if unmap {
-                    tracing::error!(
+                    error!(
                         "Window {size:?} is too large for what panel configuration allows \
                          {constrained:?}. It will be unmapped.",
                     );
@@ -233,7 +233,7 @@ impl PanelSpace {
             center_overflow_button,
         );
         if let Err(e) = res.as_ref() {
-            error!("Error in layout: {:?}", e);
+            info!("Requires relayout: {:?}", e);
         }
         res
     }
@@ -474,7 +474,7 @@ impl PanelSpace {
                 self.relax_overflow_left(left_overflow.abs() as u32, &mut left_overflow_button);
             } else if left_overflow > 0 {
                 let overflow = self.shrink_left(left_overflow as u32);
-                bail!("overflow: {}", overflow)
+                bail!("left overflow: {} {}", left_overflow, overflow)
             }
 
             let right_overflow = (right_sum - target_right_len) as i32;
@@ -483,7 +483,7 @@ impl PanelSpace {
                 self.relax_overflow_right(right_overflow.abs() as u32, &mut right_overflow_button);
             } else {
                 let overflow = self.shrink_right(right_overflow as u32);
-                bail!("overflow: {}", overflow)
+                bail!("right overflow: {} {}", right_overflow, overflow)
             }
         }
 
